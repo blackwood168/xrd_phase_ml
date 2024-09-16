@@ -1,0 +1,29 @@
+# main paths
+data_path: "CLIN_PDB"
+annotation_path: "CLIN_PDB"
+
+# annotation paths
+annotations: "test.csv"
+images: "test_images"
+
+# exp params
+save_path: "Experiments/unet_3layers/14.09_clin_doob"
+test_name: test
+
+#laue params: romb, clin, all
+laue: 'clin'
+
+trainer:
+  #precision: 32
+  accelerator: auto
+  #  accelerator: gpu
+  devices: auto
+  #  devices: [0]
+
+weights: "Experiments/unet_3layers/14.09_clin_doob/model.ckpt"
+model:
+
+dataloader:
+  batch_size: 128
+  num_workers: 8
+

@@ -1,0 +1,57 @@
+# main paths
+data_path: "CLIN_PDB"
+annotation_path: "CLIN_PDB"
+exp_path: "Experiments"
+
+# train
+annotations: "train.csv"
+images: "clin_1.5_0.8_60k"
+
+# validation
+val_annotations: "val.csv"
+val_images: "clin_1.5_0.8_60k"
+
+# exp params
+exp_name: 14.09_clin_doob
+project: unet_3layers
+
+#laue params: romb, clin, all
+laue: 'romb'
+
+trainer:
+  #precision: 32
+  #sync_batchnorm: True
+  #gradient_clip_val: 1.0
+  max_epochs: 20
+  num_sanity_val_steps: 1
+  accelerator: auto
+  #  accelerator: gpu
+  devices: auto
+  #  devices: [0]
+  
+weights: "Experiments/unet_3layers/14.09_clin/last.ckpt"
+
+model:
+
+dataloader:
+  batch_size: 128
+  num_workers: 8
+
+optimizer: adam
+optimizer_params:
+  lr: 0.00001
+  weight_decay: 0.0001
+
+scheduler: plateau
+scheduler_params:
+  patience: 5
+  factor: 0.1
+  verbose: True
+  target_metric: MeanSquaredError/val
+  mode: min
+
+checkpoint:
+  monitor: MeanSquaredError/val
+  filename: model
+  mode: min
+

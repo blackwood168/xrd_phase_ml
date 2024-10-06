@@ -53,8 +53,8 @@ class MiniUnet(nn.Module):
         self.double_conv = DoubleConv(128, 256)
         # Upsampling Path
         #self.up_conv4 = UpBlock(512 + 1024, 512, self.up_sample_mode)
-        self.up_conv3 = UpBlock(128 + 256, 256, self.up_sample_mode)
-        self.up_conv2 = UpBlock(128 + 256, 128, self.up_sample_mode)
+        self.up_conv3 = UpBlock(256 + 128, 256, self.up_sample_mode)
+        self.up_conv2 = UpBlock(256 + 128, 128, self.up_sample_mode)
         self.up_conv1 = UpBlock(128 + 64, 64, self.up_sample_mode)
         # Final Convolution
         self.conv_last = nn.Conv3d(64, out_classes, kernel_size=1)

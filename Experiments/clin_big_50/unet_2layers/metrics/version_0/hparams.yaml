@@ -1,0 +1,36 @@
+annotation_path: CLIN_BIG
+annotations: train.csv
+checkpoint:
+  filename: model
+  mode: min
+  monitor: MeanSquaredError/val
+data_path: CLIN_BIG
+dataloader:
+  batch_size: 128
+  num_workers: 8
+exp_name: unet_2layers
+exp_path: Experiments
+images: clin_1.5_0.8_200k
+laue: clin
+model: null
+optimizer: adam
+optimizer_params:
+  lr: 0.001
+  weight_decay: 0.0001
+project: clin_big_50
+save_path: Experiments/clin_big_50/unet_2layers
+scheduler: plateau
+scheduler_params:
+  factor: 0.1
+  mode: min
+  patience: 5
+  target_metric: MeanSquaredError/val
+  verbose: true
+trainer:
+  accelerator: auto
+  devices: auto
+  max_epochs: 50
+  num_sanity_val_steps: 1
+val_annotations: val.csv
+val_images: clin_1.5_0.8_200k
+weights: null

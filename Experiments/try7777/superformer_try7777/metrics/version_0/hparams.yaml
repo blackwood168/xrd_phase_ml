@@ -1,0 +1,37 @@
+annotation_path: CLIN_PDB
+annotations: train.csv
+checkpoint:
+  filename: model
+  mode: min
+  monitor: Loss/val
+data_path: CLIN_PDB
+dataloader:
+  batch_size: 32
+  num_workers: 8
+exp_name: superformer_try7777
+exp_path: Experiments
+images: clin_1.5_0.8_60k
+laue: clin
+model: null
+optimizer: adam
+optimizer_params:
+  lr: 0.001
+  weight_decay: 0.0001
+project: try7777
+save_path: Experiments/try7777/superformer_try7777
+scheduler: plateau
+scheduler_params:
+  factor: 0.1
+  mode: min
+  patience: 5
+  target_metric: Loss/val
+  verbose: true
+trainer:
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 20
+  max_epochs: 50
+  num_sanity_val_steps: 0
+val_annotations: val.csv
+val_images: clin_1.5_0.8_60k
+weights: null

@@ -1,0 +1,35 @@
+annotation_path: CLIN_PDB
+annotations: train.csv
+checkpoint:
+  filename: model
+  mode: min
+  monitor: MeanSquaredError/val
+data_path: CLIN_PDB
+dataloader:
+  batch_size: 128
+  num_workers: 8
+exp_name: 14.09_clin
+exp_path: Experiments
+images: clin_1.5_0.8_60k
+model: null
+optimizer: adam
+optimizer_params:
+  lr: 0.001
+  weight_decay: 0.0001
+project: unet_3layers
+save_path: Experiments/unet_3layers/14.09_clin
+scheduler: plateau
+scheduler_params:
+  factor: 0.1
+  mode: min
+  patience: 5
+  target_metric: MeanSquaredError/val
+  verbose: true
+trainer:
+  accelerator: auto
+  devices: auto
+  max_epochs: 40
+  num_sanity_val_steps: 1
+val_annotations: val.csv
+val_images: clin_1.5_0.8_60k
+weights: null

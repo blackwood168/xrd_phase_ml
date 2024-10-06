@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 from torch import optim
 from torchmetrics import MetricCollection, MeanSquaredError
+from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
 
 import cctbx
 from cctbx import miller
@@ -13,6 +14,7 @@ from cctbx.array_family import flex
 
 from losses.loss import TorchLoss
 from models.model import MiniUnet, UpBlock, DownBlock, DoubleConv
+import models.superformer as superformer
 
 
 class TrainPipeline(L.LightningModule):
@@ -20,7 +22,7 @@ class TrainPipeline(L.LightningModule):
         super().__init__()
         self.config = config
 
-        self.model = MiniUnet()
+        self.model = superformer.SuperFormer()
         if config['weights'] is not None:
             state_dict = {}
             state_old = torch.load(config['weights'])['state_dict']
@@ -30,7 +32,9 @@ class TrainPipeline(L.LightningModule):
                 state_dict[key_new] = state_old[key]
             self.model.load_state_dict(state_dict, strict=True)
             print('loaded successfully')
-        self.criterion = MeanSquaredError()
+        self.criterion = TorchLoss()
+        self.mse_loss = MeanSquaredError()
+        self.ssim = SSIM(data_range=1, size_average=True, channel=1, nonnegative_ssim=True, spatial_dims=3)
         metrics = MetricCollection([MeanSquaredError()])
         self.train_metrics = metrics.clone(postfix="/train")
         self.valid_metrics = metrics.clone(postfix="/val")
@@ -98,19 +102,31 @@ class TrainPipeline(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
+        #print(x.shape)
         out = self.model(x)
+        mask = x==0
+        out = out*mask + x
         loss = self.criterion(out, y)
-
         self.log("Loss/train", loss, prog_bar=True)
         self.train_metrics.update(out, y)
+        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(out)-torch.abs(y)), axis = (1, 2, 3, 4))/torch.sum(torch.abs(y), axis = (1, 2, 3, 4)))
+        self.log('R/train', R_factor)
+        self.log('SSIM_loss/train', 1 - self.ssim(out, y))
+        #self.log('MSE', self.mse_loss(out, y))
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         out = self.model(x)
+        mask = x==0
+        out = out*mask + x
         loss = self.criterion(out, y)
         self.log("Loss/val", loss, prog_bar=True)
         self.valid_metrics.update(out, y)
+        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(out)-torch.abs(y)), axis = (1, 2, 3, 4))/torch.sum(torch.abs(y), axis = (1, 2, 3, 4)))
+        self.log('R/val', R_factor)
+        self.log('SSIM_loss/val', 1 - self.ssim(out, y))
+        #self.log('MSE', self.mse_loss(out, y))
  
     def on_training_epoch_end(self):
         train_metrics = self.train_metrics.compute()
@@ -127,8 +143,10 @@ class TestPipeline(L.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.criterion = MeanSquaredError()
-        self.model = MiniUnet()
+        self.criterion = TorchLoss()
+        self.model = superformer.SuperFormer()
+        self.ssim = SSIM(data_range=1, size_average=True, channel=1, nonnegative_ssim=True, spatial_dims=3)
+        self.mse_loss = MeanSquaredError()
         state_dict = {}
         state_old = torch.load(config['weights'])['state_dict']
         for key in state_old.keys():
@@ -139,6 +157,9 @@ class TestPipeline(L.LightningModule):
         self.test_outputs = []
         self.test_outputs_pre1 = []
         self.test_outputs_pre2 = []
+        self.ssims = []
+        self.mses = []
+        self.R_factors = []
         laue_types = {'romb': {'h': [0, 16], 'k': [0, 21], 'l': [0, 28]}, 'clin': {'h': [-13, 12], 'k': [0, 17], 'l': [0, 22]}, 'all': {'h': [-16, 16], 'k': [-14, 21], 'l': [0, 28]}}
         hkl_minmax = laue_types[self.config['laue']]
         dics = {'h': {}, 'k': {}, 'l': {}}
@@ -180,12 +201,19 @@ class TestPipeline(L.LightningModule):
         recon = self.postprocessing1(x, out)
         self.test_outputs_pre1.append(self.criterion(y, recon).cpu().numpy())
         recon = self.postprocessing2(recon, gr)
+        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(recon)-torch.abs(y)), axis = (1, 2, 3, 4))/torch.sum(torch.abs(y), axis = (1, 2, 3, 4))).cpu().numpy()
+        self.R_factors.append(R_factor)
         self.test_outputs_pre2.append(self.criterion(y, recon).cpu().numpy())
+        self.mses.append(self.mse_loss(y, recon).cpu().numpy())
+        self.ssims.append(self.ssim(y, recon).cpu().numpy())
 
     def on_test_epoch_end(self):
         print(f'without pre: {np.mean(self.test_outputs)}')
         print(f'with pre1: {np.mean(self.test_outputs_pre1)}')
         print(f'with pre1 + pre2: {np.mean(self.test_outputs_pre2)}')
+        print(f'mse: {np.mean(self.mses)}')
+        print(f'ssim: {np.mean(self.ssims)}')
+        print(f'R_factor: {np.mean(self.R_factors)}')
         '''if self.trainer.is_global_zero:
             out_class = torch.cat([o['out_class'] for o in all_test_outputs], dim=0).cpu().detach().tolist()
             idx = torch.cat([o['idx'] for o in all_test_outputs], dim=0).cpu().detach().tolist()

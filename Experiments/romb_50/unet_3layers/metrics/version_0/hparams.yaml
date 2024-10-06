@@ -1,0 +1,36 @@
+annotation_path: ROMB_PDB
+annotations: train.csv
+checkpoint:
+  filename: model
+  mode: min
+  monitor: MeanSquaredError/val
+data_path: ROMB_PDB
+dataloader:
+  batch_size: 128
+  num_workers: 8
+exp_name: unet_3layers
+exp_path: Experiments
+images: romb_1.5_0.8_60k
+laue: romb
+model: null
+optimizer: adam
+optimizer_params:
+  lr: 0.001
+  weight_decay: 0.0001
+project: romb_50
+save_path: Experiments/romb_50/unet_3layers
+scheduler: plateau
+scheduler_params:
+  factor: 0.1
+  mode: min
+  patience: 5
+  target_metric: MeanSquaredError/val
+  verbose: true
+trainer:
+  accelerator: auto
+  devices: auto
+  max_epochs: 50
+  num_sanity_val_steps: 1
+val_annotations: val.csv
+val_images: romb_1.5_0.8_60k
+weights: null

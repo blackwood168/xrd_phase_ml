@@ -7,7 +7,7 @@ annotations: "test.csv"
 images: "test_images"
 
 # exp params
-save_path: "Experiments/unet_3layers/14.09_clin_doob"
+save_path: "Experiments/try/superformer_try"
 test_name: test
 
 #laue params: romb, clin, all
@@ -20,10 +20,10 @@ trainer:
   devices: auto
   #  devices: [0]
 
-weights: "Experiments/unet_3layers/14.09_clin_doob/model.ckpt"
+weights: "Experiments/try/superformer_try/model.ckpt"
 model:
 
 dataloader:
-  batch_size: 128
+  batch_size: 512
   num_workers: 8
 

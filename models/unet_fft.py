@@ -5,23 +5,42 @@ class DoubleConv(nn.Module):
         super(DoubleConv, self).__init__()
         self.double_conv = nn.Sequential(
             nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+            nn.InstanceNorm3d(out_channels),
             nn.GELU(),
             nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+            nn.InstanceNorm3d(out_channels),
             nn.GELU(),
         )
 
     def forward(self, x):
         return self.double_conv(x)
+class ResFBlock(nn.Module):
+    def __init__(self, in_channels, out_channels): #in and out must be the same...
+        super(ResFBlock, self).__init__()
+        self.double_conv = DoubleConv(in_channels, out_channels)
+        self.real_conv = nn.Sequential(
+            nn.Conv3d(in_channels, out_channels, kernel_size=1, padding=0),
+            nn.InstanceNorm3d(out_channels),
+            nn.GELU(),
+            nn.Conv3d(out_channels, out_channels, kernel_size=1, padding=0),
+            nn.InstanceNorm3d(out_channels),
+            nn.GELU(),
+        )
+    def forward(self, x):
+        x_skip = x
+        x_conv = self.double_conv(x)
+        x_real = torch.abs(torch.fft.rfftn(x, s = x.shape[2:], dim = (-3, -2, -1)))
+        x_real = self.real_conv(x_real)
+        return x_skip + x_conv + torch.fft.irfftn(x_real, s = x.shape[2:], dim  = (-3, -2, -1))
 class DownBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(DownBlock, self).__init__()
         self.double_conv = DoubleConv(in_channels, out_channels)
+        self.fft_block = ResFBlock(out_channels, out_channels)
         self.down_sample = nn.MaxPool3d(2)
 
     def forward(self, x):
-        skip_out = self.double_conv(x)
+        skip_out = self.fft_block(self.double_conv(x))
         down_out = self.down_sample(skip_out)
         return (down_out, skip_out)
 class UpBlock(nn.Module):
@@ -34,13 +53,14 @@ class UpBlock(nn.Module):
         #else:
         #    raise ValueError("Unsupported `up_sample_mode` (can take one of `conv_transpose` or `trilinear`)")
         self.double_conv = DoubleConv(in_channels, out_channels)
+        self.fft_block = ResFBlock(out_channels, out_channels)
 
     def forward(self, down_input, skip_input):
         x = nn.Upsample(size = skip_input.shape[2:], mode = 'trilinear', align_corners=False)(down_input)
         x = torch.cat([x, skip_input], dim=1)
-        return self.double_conv(x)
+        return self.fft_block(self.double_conv(x))
 
-class MiniUnet(nn.Module):
+class UNet_FFT(nn.Module):
     def __init__(self, out_classes = 1, up_sample_mode='trilinear'):
         super().__init__()
         self.up_sample_mode = up_sample_mode

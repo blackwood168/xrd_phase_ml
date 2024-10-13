@@ -15,6 +15,7 @@ from cctbx.array_family import flex
 from losses.loss import TorchLoss
 from models.model import MiniUnet, UpBlock, DownBlock, DoubleConv
 import models.superformer as superformer
+import models.unet_fft as unet_fft
 
 
 class TrainPipeline(L.LightningModule):
@@ -22,7 +23,9 @@ class TrainPipeline(L.LightningModule):
         super().__init__()
         self.config = config
 
-        self.model = superformer.SuperFormer()
+        #self.model = superformer.SuperFormer()
+        #self.model = MiniUnet()
+        self.model = unet_fft.UNet_FFT()
         if config['weights'] is not None:
             state_dict = {}
             state_old = torch.load(config['weights'])['state_dict']

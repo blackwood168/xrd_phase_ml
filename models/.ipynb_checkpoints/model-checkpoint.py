@@ -5,10 +5,10 @@ class DoubleConv(nn.Module):
         super(DoubleConv, self).__init__()
         self.double_conv = nn.Sequential(
             nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.InstanceNorm3d(out_channels),
+            nn.BatchNorm3d(out_channels),
             nn.GELU(),
             nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.InstanceNorm3d(out_channels),
+            nn.BatchNorm3d(out_channels),
             nn.GELU(),
         )
 
@@ -47,13 +47,13 @@ class MiniUnet(nn.Module):
         # Downsampling Path
         self.down_conv1 = DownBlock(1, 64)
         self.down_conv2 = DownBlock(64, 128)
-        self.down_conv3 = DownBlock(128, 256)
+        #self.down_conv3 = DownBlock(128, 256)
         #self.down_conv4 = DownBlock(256, 512)
         # Bottleneck
         self.double_conv = DoubleConv(128, 256)
         # Upsampling Path
         #self.up_conv4 = UpBlock(512 + 1024, 512, self.up_sample_mode)
-        self.up_conv3 = UpBlock(256 + 128, 256, self.up_sample_mode)
+        #self.up_conv3 = UpBlock(256 + 128, 256, self.up_sample_mode)
         self.up_conv2 = UpBlock(256 + 128, 128, self.up_sample_mode)
         self.up_conv1 = UpBlock(128 + 64, 64, self.up_sample_mode)
         # Final Convolution

@@ -1,6 +1,7 @@
 # Solving the phase problem in crystallography using AI methods
 
 ![Project Image](./images/tmp_method.png)  
+*Solving the phase problem in crystallography using AI methods*
 
 ## Description
 This project introduces a novel deep learning framework for solving the phase problem in crystallography. 

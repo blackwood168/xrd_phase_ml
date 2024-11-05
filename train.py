@@ -76,12 +76,19 @@ def train(args=None):
         config,
         mode="val"
     )
-
-    model = TrainPipeline(
-        config=config,
-        train_loader=train_loader,
-        val_loader=val_loader
+    if config['pipeline'] == 'xrd_transformer':
+        model = XRDTransformerPipeline(
+            config=config,
+            train_loader=train_loader,
+            val_loader=val_loader
     )
+    else:
+        model = TrainPipeline(
+            config=config,
+            train_loader=train_loader,
+            val_loader=val_loader
+        )
+    
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=config['save_path'],

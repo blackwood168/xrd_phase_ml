@@ -6,6 +6,7 @@ import torch
 from torch import optim
 from torchmetrics import MetricCollection, MeanSquaredError
 from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
+import torch.functional as F
 
 import cctbx
 from cctbx import miller
@@ -16,6 +17,264 @@ from losses.loss import TorchLoss
 from models.model import MiniUnet, UpBlock, DownBlock, DoubleConv
 import models.superformer as superformer
 import models.unet_fft as unet_fft
+
+from models.gan_model import Generator, Discriminator
+from models.xrd_transformer import XRDTransformer
+import torch.nn as nn
+
+
+class XRDTransformerPipeline(L.LightningModule):
+    def __init__(self, config, train_loader, val_loader) -> None:
+        super().__init__()
+        self.config = config
+        
+        self.model = XRDTransformer(
+            input_shape=(26, 18, 23),  # Your tensor dimensions
+            embed_dim=256,
+            depth=6,
+            num_heads=8,
+            mlp_ratio=4.,
+            drop_rate=0.1,
+            attn_drop_rate=0.1,
+            embedding_type='onehot'  # or 'onehot'
+        )
+        if config['weights'] is not None:
+            state_dict = {}
+            state_old = torch.load(config['weights'])['state_dict']
+            for key in state_old.keys():
+                key_new = key[6:]#.lstrip('model.')
+                #print(key_new)
+                state_dict[key_new] = state_old[key]
+            self.model.load_state_dict(state_dict, strict=True)
+            print('loaded successfully')
+        self.criterion = TorchLoss()
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        
+        # Initialize SSIM metric
+        self.ssim = SSIM(data_range=1, size_average=True, channel=1, 
+                        nonnegative_ssim=True, spatial_dims=3)
+        
+        # Initialize metrics storage
+        self.training_step_outputs = []
+        self.validation_step_outputs = []
+        
+        self.save_hyperparameters(config)
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=self.config['optimizer']['lr'],
+            weight_decay=self.config['optimizer']['weight_decay']
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=self.config['trainer']['max_epochs'],
+            eta_min=self.config['optimizer']['lr'] * 0.01
+        )
+        return [optimizer], [scheduler]
+    
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        out = self.model(x)
+        loss = self.criterion(out, y)
+        
+        # Calculate metrics
+        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(out)-torch.abs(y)), 
+                                      dim=(1,2,3,4))/torch.sum(torch.abs(y), dim=(1,2,3,4)))
+        ssim_val = self.ssim(out, y)
+        ssim_loss = 1 - ssim_val
+        
+        # Log metrics
+        self.log("Loss/train", loss, prog_bar=True, sync_dist=True)
+        self.log("R/train", R_factor, prog_bar=True, sync_dist=True)
+        self.log("SSIM/train", ssim_val, sync_dist=True)
+        self.log("SSIM_loss/train", ssim_loss, sync_dist=True)
+        
+        # Store for epoch end
+        self.training_step_outputs.append({
+            'loss': loss,
+            'R_factor': R_factor,
+            'ssim': ssim_val,
+            'ssim_loss': ssim_loss
+        })
+        
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        out = self.model(x)
+        loss = self.criterion(out, y)
+        
+        # Calculate metrics
+        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(out)-torch.abs(y)), 
+                                      dim=(1,2,3,4))/torch.sum(torch.abs(y), dim=(1,2,3,4)))
+        ssim_val = self.ssim(out, y)
+        ssim_loss = 1 - ssim_val
+        mse = F.mse_loss(out, y)
+        
+        # Log metrics
+        self.log("Loss/val", loss, prog_bar=True, sync_dist=True)
+        self.log("R/val", R_factor, prog_bar=True, sync_dist=True)
+        self.log("SSIM/val", ssim_val, sync_dist=True)
+        self.log("SSIM_loss/val", ssim_loss, sync_dist=True)
+        self.log("MSE/val", mse, sync_dist=True)
+        
+        # Store for epoch end
+        self.validation_step_outputs.append({
+            'loss': loss,
+            'R_factor': R_factor,
+            'ssim': ssim_val,
+            'ssim_loss': ssim_loss,
+            'mse': mse
+        })
+        
+        return loss
+    
+    def on_train_epoch_end(self):
+        # Calculate epoch metrics
+        epoch_loss = torch.stack([x['loss'] for x in self.training_step_outputs]).mean()
+        epoch_R = torch.stack([x['R_factor'] for x in self.training_step_outputs]).mean()
+        epoch_ssim = torch.stack([x['ssim'] for x in self.training_step_outputs]).mean()
+        epoch_ssim_loss = torch.stack([x['ssim_loss'] for x in self.training_step_outputs]).mean()
+        
+        # Log epoch metrics
+        self.log('Loss/train_epoch', epoch_loss, sync_dist=True)
+        self.log('R/train_epoch', epoch_R, sync_dist=True)
+        self.log('SSIM/train_epoch', epoch_ssim, sync_dist=True)
+        self.log('SSIM_loss/train_epoch', epoch_ssim_loss, sync_dist=True)
+        
+        # Clear outputs
+        self.training_step_outputs.clear()
+    
+    def on_validation_epoch_end(self):
+        # Calculate epoch metrics
+        epoch_loss = torch.stack([x['loss'] for x in self.validation_step_outputs]).mean()
+        epoch_R = torch.stack([x['R_factor'] for x in self.validation_step_outputs]).mean()
+        epoch_ssim = torch.stack([x['ssim'] for x in self.validation_step_outputs]).mean()
+        epoch_ssim_loss = torch.stack([x['ssim_loss'] for x in self.validation_step_outputs]).mean()
+        epoch_mse = torch.stack([x['mse'] for x in self.validation_step_outputs]).mean()
+        
+        # Log epoch metrics
+        self.log('Loss/val_epoch', epoch_loss, sync_dist=True)
+        self.log('R/val_epoch', epoch_R, sync_dist=True)
+        self.log('SSIM/val_epoch', epoch_ssim, sync_dist=True)
+        self.log('SSIM_loss/val_epoch', epoch_ssim_loss, sync_dist=True)
+        self.log('MSE/val_epoch', epoch_mse, sync_dist=True)
+        
+        # Print summary
+        self.print(f"\nValidation Epoch {self.current_epoch} Summary:")
+        self.print(f"Loss: {epoch_loss:.4f}")
+        self.print(f"R-factor: {epoch_R:.4f}")
+        self.print(f"SSIM: {epoch_ssim:.4f}")
+        self.print(f"MSE: {epoch_mse:.4f}\n")
+        
+        # Clear outputs
+        self.validation_step_outputs.clear()
+    def train_dataloader(self):
+        return self.train_loader
+
+    def val_dataloader(self):
+        return self.val_loader
+
+
+class GANPipeline(L.LightningModule):
+    def __init__(self, config, train_loader, val_loader):
+        super().__init__()
+        self.automatic_optimization = False  # Set manual optimization
+        self.config = config
+        
+        # Initialize generator and discriminator
+        self.generator = Generator()
+        self.discriminator = Discriminator()
+        
+        # Loss functions
+        self.adversarial_criterion = nn.BCELoss()
+        self.reconstruction_criterion = nn.MSELoss()
+        
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        
+        if config['weights'] is not None:
+            state_dict = {}
+            state_old = torch.load(config['weights'])['state_dict']
+            for key in state_old.keys():
+                key_new = key[6:]
+                state_dict[key_new] = state_old[key]
+            self.model.load_state_dict(state_dict, strict=True)
+            print('loaded successfully')
+        
+        # Metrics
+        metrics = MetricCollection([MeanSquaredError()])
+        self.train_metrics = metrics.clone(postfix="/train")
+        self.valid_metrics = metrics.clone(postfix="/val")
+        
+        self.save_hyperparameters(config)
+
+    def configure_optimizers(self):
+        lr_g = self.config['optimizer_params'].get('lr_generator', 0.0002)
+        lr_d = self.config['optimizer_params'].get('lr_discriminator', 0.0002)
+        
+        opt_g = optim.Adam(self.generator.parameters(), lr=lr_g, betas=(0.5, 0.999))
+        opt_d = optim.Adam(self.discriminator.parameters(), lr=lr_d, betas=(0.5, 0.999))
+        
+        return [opt_g, opt_d], []
+        
+    def training_step(self, batch, batch_idx):
+        opt_g, opt_d = self.optimizers()
+        
+        x_low, x_high = batch
+        batch_size = x_low.size(0)
+        
+        # Create mask for edge regions
+        mask = (x_low != 0).float()
+        edge_mask = 1 - mask
+        
+        # Train Generator
+        opt_g.zero_grad()
+        
+        # Generate completed image
+        fake_complete = self.generator(x_low)
+        
+        # Adversarial loss
+        validity = self.discriminator(fake_complete)
+        g_loss_adv = self.adversarial_criterion(validity, torch.ones_like(validity))
+        
+        # Reconstruction loss (focused on edge regions)
+        g_loss_rec = self.reconstruction_criterion(fake_complete * edge_mask, x_high * edge_mask)
+        
+        # Total generator loss
+        g_loss = g_loss_adv + self.config.get('lambda_rec', 100.0) * g_loss_rec
+        
+        self.manual_backward(g_loss)
+        opt_g.step()
+        
+        # Train Discriminator
+        opt_d.zero_grad()
+        
+        # Real loss
+        real_validity = self.discriminator(x_high)
+        d_real_loss = self.adversarial_criterion(real_validity, torch.ones_like(real_validity))
+        
+        # Fake loss
+        fake_validity = self.discriminator(fake_complete.detach())
+        d_fake_loss = self.adversarial_criterion(fake_validity, torch.zeros_like(fake_validity))
+        
+        # Total discriminator loss
+        d_loss = (d_real_loss + d_fake_loss) / 2
+        
+        self.manual_backward(d_loss)
+        opt_d.step()
+        
+        # Log losses
+        self.log("g_loss", g_loss, prog_bar=True)
+        self.log("g_loss_adv", g_loss_adv)
+        self.log("g_loss_rec", g_loss_rec)
+        self.log("d_loss", d_loss, prog_bar=True)
+    def train_dataloader(self):
+        return self.train_loader
+
+    def val_dataloader(self):
+        return self.val_loader
 
 
 class TrainPipeline(L.LightningModule):

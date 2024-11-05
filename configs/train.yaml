@@ -17,7 +17,7 @@ project: try7777
 
 #laue params: romb, clin, all
 laue: 'clin'
-
+pipeline: 'xrd_transformer'
 trainer:
   #precision: 32
   #sync_batchnorm: True
@@ -36,7 +36,7 @@ model:
 
 dataloader:
   batch_size: 32
-  num_workers: 8
+  num_workers: 4
 
 optimizer: adam
 optimizer_params:

@@ -1,0 +1,38 @@
+data_path: /home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k
+annotation_path: /home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k
+exp_path: Experiments
+annotations: train.csv
+images: data
+val_annotations: val.csv
+val_images: data
+exp_name: '05_11'
+project: XRDTransformer
+laue: clin
+pipeline: xrd_transformer
+trainer:
+  log_every_n_steps: 20
+  max_epochs: 50
+  num_sanity_val_steps: 0
+  accelerator: auto
+  devices: auto
+weights: null
+model: null
+dataloader:
+  batch_size: 32
+  num_workers: 4
+optimizer: adam
+optimizer_params:
+  lr: 0.01
+  weight_decay: 0.0001
+scheduler: plateau
+scheduler_params:
+  patience: 5
+  factor: 0.1
+  verbose: true
+  target_metric: Loss/val
+  mode: min
+checkpoint:
+  monitor: Loss/val
+  filename: model
+  mode: min
+save_path: Experiments/XRDTransformer/05_11

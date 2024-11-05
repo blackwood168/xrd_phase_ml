@@ -80,33 +80,38 @@ class HKLEmbedding(nn.Module):
     
     def forward(self, x):
         batch_size = x.shape[0]
-        
-        # Move indices to device
-        h = self.h.to(x.device)
-        k = self.k.to(x.device)
-        l = self.l.to(x.device)
-        
+        H, W, D = self.input_shape
+
         if self.embedding_type == 'onehot':
             # Get one-hot vectors
-            h_emb = self.h_onehot[self.h]  # [B, H, W, D, H]
-            k_emb = self.k_onehot[self.k]  # [B, H, W, D, W]
-            l_emb = self.l_onehot[self.l]  # [B, H, W, D, D]
+            h_emb = self.h_onehot[self.h]  # [H, W, D, H]
+            k_emb = self.k_onehot[self.k]  # [H, W, D, W]
+            l_emb = self.l_onehot[self.l]  # [H, W, D, D]
 
             # Project to embedding dimension
-            h_emb = self.h_proj(h_emb)
-            k_emb = self.k_proj(k_emb)
-            l_emb = self.l_proj(l_emb)
+            h_emb = self.h_proj(h_emb)  # [H, W, D, embed_dim//3]
+            k_emb = self.k_proj(k_emb)  # [H, W, D, embed_dim//3]
+            l_emb = self.l_proj(l_emb)  # [H, W, D, embed_dim//3]
 
-            # Concatenate
-            return torch.cat([h_emb, k_emb, l_emb], dim=-1)
+            # Concatenate along embedding dimension
+            hkl_embedding = torch.cat([h_emb, k_emb, l_emb], dim=-1)  # [H, W, D, embed_dim]
+
+            # Reshape to match value embedding shape
+            hkl_embedding = hkl_embedding.view(-1, self.embed_dim)  # [H*W*D, embed_dim]
+
+            # Add batch dimension and expand
+            hkl_embedding = hkl_embedding.unsqueeze(0).expand(batch_size, -1, -1)  # [B, H*W*D, embed_dim]
+
+            return hkl_embedding
         else:
             # Learned embedding approach
-            hkl_coords = torch.stack([h, k, l], dim=-1).float()  # Shape: [H, W, D, 3]
-            hkl_embedding = self.hkl_proj(hkl_coords.reshape(-1, 3))
-        
-        # Expand for batch dimension
-        hkl_embedding = hkl_embedding.unsqueeze(0).expand(batch_size, -1, -1)
-        return hkl_embedding
+            hkl_coords = torch.stack([self.h, self.k, self.l], dim=-1).float()  # [H, W, D, 3]
+            hkl_embedding = self.hkl_proj(hkl_coords.reshape(-1, 3))  # [H*W*D, embed_dim]
+
+            # Add batch dimension and expand
+            hkl_embedding = hkl_embedding.unsqueeze(0).expand(batch_size, -1, -1)  # [B, H*W*D, embed_dim]
+
+            return hkl_embedding
 
 class XRDTransformer(nn.Module):
     def __init__(self, 

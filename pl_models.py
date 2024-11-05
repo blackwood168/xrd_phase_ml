@@ -30,10 +30,10 @@ class XRDTransformerPipeline(L.LightningModule):
         
         self.model = XRDTransformer(
             input_shape=(26, 18, 23),  # Your tensor dimensions
-            embed_dim=256,
-            depth=6,
-            num_heads=8,
-            mlp_ratio=4.,
+            embed_dim=128,
+            depth=4,
+            num_heads=4,
+            mlp_ratio=2.,
             drop_rate=0.1,
             attn_drop_rate=0.1,
             embedding_type='onehot'  # or 'onehot'

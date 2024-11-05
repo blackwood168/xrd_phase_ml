@@ -116,6 +116,7 @@ class XRDTransformer(nn.Module):
         
         self.input_shape = input_shape
         self.embed_dim = embed_dim
+        self.gradient_checkpointing = True
         
         # HKL Embedding
         self.hkl_embedding = HKLEmbedding(input_shape, embed_dim, embedding_type)
@@ -154,7 +155,10 @@ class XRDTransformer(nn.Module):
         
         # Apply transformer blocks
         for block in self.transformer_blocks:
-            x = block(x)
+            if self.gradient_checkpointing and self.training:
+                x = torch.utils.checkpoint.checkpoint(block, x)
+            else:
+                x = block(x)
         
         x = self.norm(x)
         

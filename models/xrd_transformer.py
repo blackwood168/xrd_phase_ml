@@ -53,7 +53,7 @@ class HKLEmbedding(nn.Module):
         self.embed_dim = embed_dim
         self.embedding_type = embedding_type
         
-        # Generate normalized coordinate meshgrid
+        # Generate coordinate meshgrid
         h = torch.arange(input_shape[0])
         k = torch.arange(input_shape[1])
         l = torch.arange(input_shape[2])
@@ -62,14 +62,15 @@ class HKLEmbedding(nn.Module):
         self.h, self.k, self.l = torch.meshgrid(h, k, l, indexing='ij')
         
         if embedding_type == 'onehot':
-            # Ensure dimensions divide evenly
-            dim_per_component = embed_dim // 3
-            remaining_dim = embed_dim - (dim_per_component * 3)
+            # Create fixed one-hot encodings
+            self.register_buffer('h_onehot', torch.eye(input_shape[0]))
+            self.register_buffer('k_onehot', torch.eye(input_shape[1]))
+            self.register_buffer('l_onehot', torch.eye(input_shape[2]))
             
-            # Distribute remaining dimensions
-            self.h_embed = nn.Embedding(input_shape[0], dim_per_component + remaining_dim)
-            self.k_embed = nn.Embedding(input_shape[1], dim_per_component)
-            self.l_embed = nn.Embedding(input_shape[2], dim_per_component)
+            # Simple linear projections to desired dimension
+            self.h_proj = nn.Linear(input_shape[0], embed_dim // 3)
+            self.k_proj = nn.Linear(input_shape[1], embed_dim // 3)
+            self.l_proj = nn.Linear(input_shape[2], embed_dim - 2*(embed_dim // 3))
         else:  # learned
             self.hkl_proj = nn.Sequential(
                 nn.Linear(3, embed_dim // 2),
@@ -86,13 +87,18 @@ class HKLEmbedding(nn.Module):
         l = self.l.to(x.device)
         
         if self.embedding_type == 'onehot':
-            # One-hot embedding approach
-            h_emb = self.h_embed(h.flatten())
-            k_emb = self.k_embed(k.flatten())
-            l_emb = self.l_embed(l.flatten())
-            
-            # Concatenate embeddings
-            hkl_embedding = torch.cat([h_emb, k_emb, l_emb], dim=-1)
+            # Get one-hot vectors
+            h_emb = self.h_onehot[self.h]  # [B, H, W, D, H]
+            k_emb = self.k_onehot[self.k]  # [B, H, W, D, W]
+            l_emb = self.l_onehot[self.l]  # [B, H, W, D, D]
+
+            # Project to embedding dimension
+            h_emb = self.h_proj(h_emb)
+            k_emb = self.k_proj(k_emb)
+            l_emb = self.l_proj(l_emb)
+
+            # Concatenate
+            return torch.cat([h_emb, k_emb, l_emb], dim=-1)
         else:
             # Learned embedding approach
             hkl_coords = torch.stack([h, k, l], dim=-1).float()  # Shape: [H, W, D, 3]

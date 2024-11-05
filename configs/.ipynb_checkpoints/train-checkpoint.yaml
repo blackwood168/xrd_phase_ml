@@ -12,7 +12,7 @@ val_annotations: "val.csv"
 val_images: "data"
 
 # exp params
-exp_name: '05_11'
+exp_name: 'try06_11'
 project: 'XRDTransformer'
 
 #laue params: romb, clin, all

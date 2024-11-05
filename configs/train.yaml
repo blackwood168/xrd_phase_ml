@@ -1,19 +1,19 @@
 # main paths
-data_path: "CLIN_PDB"
-annotation_path: "CLIN_PDB"
+data_path: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k"
+annotation_path: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k"
 exp_path: "Experiments"
 
 # train
 annotations: "train.csv"
-images: "clin_1.5_0.8_60k"
+images: "data"
 
 # validation
 val_annotations: "val.csv"
-val_images: "clin_1.5_0.8_60k"
+val_images: "data"
 
 # exp params
-exp_name: superformer_try7777
-project: try7777
+exp_name: '05_11'
+project: 'XRDTransformer'
 
 #laue params: romb, clin, all
 laue: 'clin'
@@ -36,11 +36,11 @@ model:
 
 dataloader:
   batch_size: 32
-  num_workers: 4
+  num_workers: 8
 
 optimizer: adam
 optimizer_params:
-  lr: 0.001
+  lr: 0.01
   weight_decay: 0.0001
 
 scheduler: plateau

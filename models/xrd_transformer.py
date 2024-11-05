@@ -1,7 +1,51 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+class MultiHeadSelfAttention3D(nn.Module):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim ** -0.5
 
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, x):
+        B, N, C = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv.unbind(0)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
+class TransformerBlock(nn.Module):
+    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, drop=0., attn_drop=0.):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = MultiHeadSelfAttention3D(dim, num_heads=num_heads, qkv_bias=qkv_bias, 
+                                           attn_drop=attn_drop, proj_drop=drop)
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, int(dim * mlp_ratio)),
+            nn.GELU(),
+            nn.Dropout(drop),
+            nn.Linear(int(dim * mlp_ratio), dim),
+            nn.Dropout(drop)
+        )
+
+    def forward(self, x):
+        x = x + self.attn(self.norm1(x))
+        x = x + self.mlp(self.norm2(x))
+        return x
 class HKLEmbedding(nn.Module):
     def __init__(self, input_shape, embed_dim, embedding_type='learned'):
         super().__init__()
@@ -18,12 +62,15 @@ class HKLEmbedding(nn.Module):
         self.h, self.k, self.l = torch.meshgrid(h, k, l, indexing='ij')
         
         if embedding_type == 'onehot':
-            # One-hot encoding approach
-            self.h_embed = nn.Embedding(input_shape[0], embed_dim // 3)
-            self.k_embed = nn.Embedding(input_shape[1], embed_dim // 3)
-            self.l_embed = nn.Embedding(input_shape[2], embed_dim // 3)
+            # Ensure dimensions divide evenly
+            dim_per_component = embed_dim // 3
+            remaining_dim = embed_dim - (dim_per_component * 3)
+            
+            # Distribute remaining dimensions
+            self.h_embed = nn.Embedding(input_shape[0], dim_per_component + remaining_dim)
+            self.k_embed = nn.Embedding(input_shape[1], dim_per_component)
+            self.l_embed = nn.Embedding(input_shape[2], dim_per_component)
         else:  # learned
-            # Learned embedding approach
             self.hkl_proj = nn.Sequential(
                 nn.Linear(3, embed_dim // 2),
                 nn.ReLU(),

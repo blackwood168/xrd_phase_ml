@@ -8,10 +8,10 @@ from torchmetrics import MetricCollection, MeanSquaredError
 from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
 import torch.functional as F
 
-import cctbx
-from cctbx import miller
-from cctbx import crystal
-from cctbx.array_family import flex
+#import cctbx
+#from cctbx import miller
+#from cctbx import crystal
+#from cctbx.array_family import flex
 
 from losses.loss import TorchLoss
 from models.model import MiniUnet, UpBlock, DownBlock, DoubleConv
@@ -63,13 +63,12 @@ class XRDTransformerPipeline(L.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             self.model.parameters(),
-            lr=self.config['optimizer']['lr'],
-            weight_decay=self.config['optimizer']['weight_decay']
+            **self.config['optimizer_params']
         )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
             T_max=self.config['trainer']['max_epochs'],
-            eta_min=self.config['optimizer']['lr'] * 0.01
+            eta_min=self.config['optimizer_params']['lr'] * 0.01
         )
         return [optimizer], [scheduler]
     

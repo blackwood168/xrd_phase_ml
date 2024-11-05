@@ -12,7 +12,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.utilities import rank_zero_only
 
 from datasets.train import get_train_dl_ds
-from pl_models import TrainPipeline
+from pl_models import TrainPipeline, XRDTransformerPipeline
 
 
 def load_config(config_path):

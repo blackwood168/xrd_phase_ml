@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-#from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
+from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
 
 
 class TorchLoss(nn.Module):

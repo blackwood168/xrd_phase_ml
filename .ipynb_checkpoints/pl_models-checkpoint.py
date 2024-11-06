@@ -51,13 +51,15 @@ class XRDTransformerPipeline(L.LightningModule):
         self.train_loader = train_loader
         self.val_loader = val_loader
         
-        # Initialize SSIM metric
-        self.ssim = SSIM(data_range=1, size_average=True, channel=1, 
-                        nonnegative_ssim=True, spatial_dims=3)
+        self.mse_loss = MeanSquaredError()
+        self.ssim = SSIM(data_range=1, size_average=True, channel=1, nonnegative_ssim=True, spatial_dims=3)
+        metrics = MetricCollection([MeanSquaredError()])
+        self.train_metrics = metrics.clone(postfix="/train")
+        self.valid_metrics = metrics.clone(postfix="/val")
         
         # Initialize metrics storage
-        self.training_step_outputs = []
-        self.validation_step_outputs = []
+        #self.training_step_outputs = []
+        #self.validation_step_outputs = []
         
         self.save_hyperparameters(config)
     def configure_optimizers(self):
@@ -76,99 +78,34 @@ class XRDTransformerPipeline(L.LightningModule):
         x, y = batch
         out = self.model(x)
         loss = self.criterion(out, y)
-        
-        # Calculate metrics
-        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(out)-torch.abs(y)), 
-                                      dim=(1,2,3,4))/torch.sum(torch.abs(y), dim=(1,2,3,4)))
-        ssim_val = self.ssim(out, y)
-        ssim_loss = 1 - ssim_val
-        
-        # Log metrics
-        self.log("Loss/train", loss, prog_bar=True, sync_dist=True)
-        self.log("R/train", R_factor, prog_bar=True, sync_dist=True)
-        self.log("SSIM/train", ssim_val, sync_dist=True)
-        self.log("SSIM_loss/train", ssim_loss, sync_dist=True)
-        
-        # Store for epoch end
-        self.training_step_outputs.append({
-            'loss': loss,
-            'R_factor': R_factor,
-            'ssim': ssim_val,
-            'ssim_loss': ssim_loss
-        })
-        
+        self.log("Loss/train", loss, prog_bar=True)
+        self.train_metrics.update(out, y)
+        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(out)-torch.abs(y)), axis = (1, 2, 3, 4))/torch.sum(torch.abs(y), axis = (1, 2, 3, 4)))
+        self.log('R/train', R_factor)
+        self.log('SSIM_loss/train', 1 - self.ssim(out, y))
         return loss
     
     def validation_step(self, batch, batch_idx):
         x, y = batch
         out = self.model(x)
         loss = self.criterion(out, y)
-        
-        # Calculate metrics
-        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(out)-torch.abs(y)), 
-                                      dim=(1,2,3,4))/torch.sum(torch.abs(y), dim=(1,2,3,4)))
-        ssim_val = self.ssim(out, y)
-        ssim_loss = 1 - ssim_val
-        mse = F.mse_loss(out, y)
-        
-        # Log metrics
-        self.log("Loss/val", loss, prog_bar=True, sync_dist=True)
-        self.log("R/val", R_factor, prog_bar=True, sync_dist=True)
-        self.log("SSIM/val", ssim_val, sync_dist=True)
-        self.log("SSIM_loss/val", ssim_loss, sync_dist=True)
-        self.log("MSE/val", mse, sync_dist=True)
-        
-        # Store for epoch end
-        self.validation_step_outputs.append({
-            'loss': loss,
-            'R_factor': R_factor,
-            'ssim': ssim_val,
-            'ssim_loss': ssim_loss,
-            'mse': mse
-        })
+        self.log("Loss/val", loss, prog_bar=True)
+        self.valid_metrics.update(out, y)
+        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(out)-torch.abs(y)), axis = (1, 2, 3, 4))/torch.sum(torch.abs(y), axis = (1, 2, 3, 4)))
+        self.log('R/val', R_factor)
+        self.log('SSIM_loss/val', 1 - self.ssim(out, y))
         
         return loss
     
-    def on_train_epoch_end(self):
-        # Calculate epoch metrics
-        epoch_loss = torch.stack([x['loss'] for x in self.training_step_outputs]).mean()
-        epoch_R = torch.stack([x['R_factor'] for x in self.training_step_outputs]).mean()
-        epoch_ssim = torch.stack([x['ssim'] for x in self.training_step_outputs]).mean()
-        epoch_ssim_loss = torch.stack([x['ssim_loss'] for x in self.training_step_outputs]).mean()
-        
-        # Log epoch metrics
-        self.log('Loss/train_epoch', epoch_loss, sync_dist=True)
-        self.log('R/train_epoch', epoch_R, sync_dist=True)
-        self.log('SSIM/train_epoch', epoch_ssim, sync_dist=True)
-        self.log('SSIM_loss/train_epoch', epoch_ssim_loss, sync_dist=True)
-        
-        # Clear outputs
-        self.training_step_outputs.clear()
-    
+    def on_training_epoch_end(self):
+        train_metrics = self.train_metrics.compute()
+        self.log_dict(train_metrics)
+        self.train_metrics.reset()
+
     def on_validation_epoch_end(self):
-        # Calculate epoch metrics
-        epoch_loss = torch.stack([x['loss'] for x in self.validation_step_outputs]).mean()
-        epoch_R = torch.stack([x['R_factor'] for x in self.validation_step_outputs]).mean()
-        epoch_ssim = torch.stack([x['ssim'] for x in self.validation_step_outputs]).mean()
-        epoch_ssim_loss = torch.stack([x['ssim_loss'] for x in self.validation_step_outputs]).mean()
-        epoch_mse = torch.stack([x['mse'] for x in self.validation_step_outputs]).mean()
-        
-        # Log epoch metrics
-        self.log('Loss/val_epoch', epoch_loss, sync_dist=True)
-        self.log('R/val_epoch', epoch_R, sync_dist=True)
-        self.log('SSIM/val_epoch', epoch_ssim, sync_dist=True)
-        self.log('SSIM_loss/val_epoch', epoch_ssim_loss, sync_dist=True)
-        self.log('MSE/val_epoch', epoch_mse, sync_dist=True)
-        
-        # Print summary
-        self.print(f"\nValidation Epoch {self.current_epoch} Summary:")
-        self.print(f"Loss: {epoch_loss:.4f}")
-        self.print(f"R-factor: {epoch_R:.4f}")
-        self.print(f"SSIM: {epoch_ssim:.4f}")
-        self.print(f"MSE: {epoch_mse:.4f}\n")
-        
-        # Clear outputs
-        self.validation_step_outputs.clear()
+        valid_metrics = self.valid_metrics.compute()
+        self.log_dict(valid_metrics)
+        self.valid_metrics.reset()
     def train_dataloader(self):
         return self.train_loader
 

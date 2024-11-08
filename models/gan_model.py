@@ -10,6 +10,7 @@ class Generator(nn.Module):
             self._make_encoder_block(in_channels, features_g),
             self._make_encoder_block(features_g, features_g * 2),
             self._make_encoder_block(features_g * 2, features_g * 4),
+            self._make_encoder_block(features_g * 4, features_g * 4)
         )
         
         # Bottleneck
@@ -28,6 +29,7 @@ class Generator(nn.Module):
             self._make_decoder_block(features_g * 2, features_g),
             self._make_decoder_block(features_g, features_g),
             nn.Conv3d(features_g, in_channels, kernel_size=3, padding=1),
+            nn.AdaptiveAvgPool3d((26, 18, 23))
         )
 
     def _make_encoder_block(self, in_channels, out_channels):
@@ -64,7 +66,7 @@ class Generator(nn.Module):
         return output * (1 - mask) + x * mask
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=1, features_d=64):
+    def __init__(self, in_channels=1, features_d=32):
         super().__init__()
         
         self.main = nn.Sequential(
@@ -76,10 +78,10 @@ class Discriminator(nn.Module):
             nn.Conv3d(features_d * 8, 1, kernel_size=3, stride=1, padding=1),
         )
         
-        self.activation = nn.Sigmoid()
+        #self.activation = nn.Sigmoid()
 
     def _make_disc_block(self, in_channels, out_channels, batch_norm=True):
-        layers = [nn.Conv3d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)]
+        layers = [nn.Conv3d(in_channels, out_channels, kernel_size=4, stride=1, padding=1)]
         if batch_norm:
             layers.append(nn.InstanceNorm3d(out_channels))
         layers.append(nn.LeakyReLU(0.2, inplace=True))
@@ -88,4 +90,4 @@ class Discriminator(nn.Module):
     def forward(self, x):
         features = self.main(x)
         # Global average pooling and activation
-        return self.activation(torch.mean(features, dim=[2,3,4]))
+        return torch.mean(features, dim=[2,3,4])

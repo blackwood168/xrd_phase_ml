@@ -1,6 +1,7 @@
 # main paths
-data_path: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k"
-annotation_path: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k"
+#for datasphere: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k"
+data_path: "/home/arthur/clin_1.5_0.8_500k"
+annotation_path: "/home/arthur/clin_1.5_0.8_500k"
 exp_path: "Experiments"
 
 # train
@@ -12,18 +13,19 @@ val_annotations: "val.csv"
 val_images: "data"
 
 # exp params
-exp_name: 'try_75k'
-project: 'XRDTransformer'
+exp_name: 'try_500k'
+project: 'GAN'
 
 #laue params: romb, clin, all
 laue: 'clin'
-pipeline: 'xrd_transformer'
+#pipeline: 'xrd_transformer', 'gan', 'unet'
+pipeline: 'gan'
 trainer:
-  precision: "16-mixed"
+  #precision: "16-mixed"
   #sync_batchnorm: True
   #gradient_clip_val: 1.0
   log_every_n_steps: 20
-  max_epochs: 20
+  max_epochs: 50
   num_sanity_val_steps: 0
   accelerator: auto
   #  accelerator: gpu
@@ -35,13 +37,14 @@ weights:
 model:
 
 dataloader:
-  batch_size: 8
-  num_workers: 16
+  batch_size: 160
+  num_workers: 12
 
 optimizer: adam
 optimizer_params:
   lr: 0.001
   weight_decay: 0.0001
+
 
 scheduler: plateau
 scheduler_params:
@@ -50,9 +53,10 @@ scheduler_params:
   verbose: True
   target_metric: Loss/val
   mode: min
-
+#g_loss/val for GAN
+#Loss/val for other pipelines
 checkpoint:
-  monitor: Loss/val
+  monitor: g_loss/val
   filename: model
   mode: min
 

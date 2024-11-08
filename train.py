@@ -12,7 +12,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.utilities import rank_zero_only
 
 from datasets.train import get_train_dl_ds
-from pl_models import TrainPipeline, XRDTransformerPipeline
+from pl_models import TrainPipeline, XRDTransformerPipeline, GANPipeline
 
 
 def load_config(config_path):
@@ -82,8 +82,14 @@ def train(args=None):
             train_loader=train_loader,
             val_loader=val_loader
     )
-    else:
+    elif config['pipeline'] == 'unet':
         model = TrainPipeline(
+            config=config,
+            train_loader=train_loader,
+            val_loader=val_loader
+        )
+    elif config['pipeline'] == 'gan':
+        model = GANPipeline(
             config=config,
             train_loader=train_loader,
             val_loader=val_loader

@@ -124,7 +124,7 @@ class GANPipeline(L.LightningModule):
         self.discriminator = Discriminator()
         
         # Loss functions
-        self.adversarial_criterion = nn.BCELoss()
+        self.adversarial_criterion = nn.BCEWithLogitsLoss()
         self.reconstruction_criterion = nn.MSELoss()
         
         self.train_loader = train_loader
@@ -140,6 +140,8 @@ class GANPipeline(L.LightningModule):
             print('loaded successfully')
         
         # Metrics
+        self.mse_loss = MeanSquaredError()
+        self.ssim = SSIM(data_range=1, size_average=True, channel=1, nonnegative_ssim=True, spatial_dims=3)
         metrics = MetricCollection([MeanSquaredError()])
         self.train_metrics = metrics.clone(postfix="/train")
         self.valid_metrics = metrics.clone(postfix="/val")
@@ -161,22 +163,26 @@ class GANPipeline(L.LightningModule):
         x_low, x_high = batch
         batch_size = x_low.size(0)
         
-        # Create mask for edge regions
-        mask = (x_low != 0).float()
-        edge_mask = 1 - mask
-        
-        # Train Generator
-        opt_g.zero_grad()
+        # Create mask for edge regions - x_low contains zeros in edge regions that need to be reconstructed
+        # So mask is 1 where we have original values (center) and 0 where we need to reconstruct (edges)
+        center_mask = (x_low != 0).float()
         
         # Generate completed image
         fake_complete = self.generator(x_low)
         
-        # Adversarial loss
-        validity = self.discriminator(fake_complete)
+        # Combine generated edges with original center
+        # Keep original values where center_mask is 1, use generated values where center_mask is 0
+        combined_output = center_mask * x_low + (1 - center_mask) * fake_complete
+        
+        # Train Generator
+        opt_g.zero_grad()
+        
+        # Adversarial loss on combined output
+        validity = self.discriminator(combined_output)
         g_loss_adv = self.adversarial_criterion(validity, torch.ones_like(validity))
         
-        # Reconstruction loss (focused on edge regions)
-        g_loss_rec = self.reconstruction_criterion(fake_complete * edge_mask, x_high * edge_mask)
+        # Reconstruction loss only on edge regions
+        g_loss_rec = self.reconstruction_criterion(fake_complete * (1 - center_mask), x_high * (1 - center_mask))
         
         # Total generator loss
         g_loss = g_loss_adv + self.config.get('lambda_rec', 100.0) * g_loss_rec
@@ -192,7 +198,7 @@ class GANPipeline(L.LightningModule):
         d_real_loss = self.adversarial_criterion(real_validity, torch.ones_like(real_validity))
         
         # Fake loss
-        fake_validity = self.discriminator(fake_complete.detach())
+        fake_validity = self.discriminator(combined_output.detach())
         d_fake_loss = self.adversarial_criterion(fake_validity, torch.zeros_like(fake_validity))
         
         # Total discriminator loss
@@ -206,6 +212,56 @@ class GANPipeline(L.LightningModule):
         self.log("g_loss_adv", g_loss_adv)
         self.log("g_loss_rec", g_loss_rec)
         self.log("d_loss", d_loss, prog_bar=True)
+        
+        # Update metrics using combined output
+        self.train_metrics.update(combined_output, x_high)
+        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(combined_output)-torch.abs(x_high)), axis = (1, 2, 3, 4))/torch.sum(torch.abs(x_high), axis = (1, 2, 3, 4)))
+        self.log('R/train', R_factor)
+        self.log('SSIM_loss/train', 1 - self.ssim(combined_output, x_high))
+        
+    def validation_step(self, batch, batch_idx):
+        x_low, x_high = batch
+        
+        # Create mask for center region
+        center_mask = (x_low != 0).float()
+        
+        # Generate completed image
+        fake_complete = self.generator(x_low)
+        
+        # Combine generated edges with original center
+        combined_output = center_mask * x_low + (1 - center_mask) * fake_complete
+        
+        # Calculate validation metrics
+        validity = self.discriminator(combined_output)
+        g_loss_adv = self.adversarial_criterion(validity, torch.ones_like(validity))
+        
+        # Reconstruction loss only on edge regions
+        g_loss_rec = self.reconstruction_criterion(fake_complete * (1 - center_mask), x_high * (1 - center_mask))
+        
+        g_loss = g_loss_adv + self.config.get('lambda_rec', 100.0) * g_loss_rec
+        
+        # Log validation metrics
+        self.log("g_loss/val", g_loss, prog_bar=True)
+        self.log("g_loss_adv/val", g_loss_adv)
+        self.log("g_loss_rec/val", g_loss_rec)
+        
+        self.valid_metrics.update(combined_output, x_high)
+        R_factor = torch.mean(torch.sum(torch.abs(torch.abs(combined_output)-torch.abs(x_high)), axis = (1, 2, 3, 4))/torch.sum(torch.abs(x_high), axis = (1, 2, 3, 4)))
+        self.log('R/val', R_factor)
+        self.log('SSIM_loss/val', 1 - self.ssim(combined_output, x_high))
+        
+        return g_loss
+
+    def on_training_epoch_end(self):
+        train_metrics = self.train_metrics.compute()
+        self.log_dict(train_metrics)
+        self.train_metrics.reset()
+
+    def on_validation_epoch_end(self):
+        valid_metrics = self.valid_metrics.compute()
+        self.log_dict(valid_metrics)
+        self.valid_metrics.reset()
+
     def train_dataloader(self):
         return self.train_loader
 

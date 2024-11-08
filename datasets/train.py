@@ -24,10 +24,10 @@ class TrainDataset(Dataset):
         )
         if mode == 'train':
             first_index = 0
-            max_index = 60000
+            max_index = 0
         else:
             first_index = 0
-            max_index = 15000
+            max_index = 0
         self._read_csv(csv_path, first_index, max_index)
         print(mode, len(self.annotations))
         laue_types = {'romb': {'h': [0, 16], 'k': [0, 21], 'l': [0, 28]}, 'clin': {'h': [-13, 12], 'k': [0, 17], 'l': [0, 22]}, 'all': {'h': [-16, 16], 'k': [-14, 21], 'l': [0, 28]}}

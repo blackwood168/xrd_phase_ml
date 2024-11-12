@@ -1,62 +1,64 @@
-# main paths
-#for datasphere: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k"
-data_path: "/home/arthur/clin_1.5_0.8_500k"
+# Data Paths
+data_path: "/home/arthur/clin_1.5_0.8_500k"          # For datasphere: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k"
 annotation_path: "/home/arthur/clin_1.5_0.8_500k"
 exp_path: "Experiments"
 
-# train
+# Training Data
 annotations: "train.csv"
 images: "data"
 
-# validation
+# Validation Data  
 val_annotations: "val.csv"
 val_images: "data"
 
-# exp params
+# Experiment Configuration
 exp_name: 'try_500k'
 project: 'GAN'
+laue: 'clin'                # Options: romb, clin, all
+pipeline: 'gan'             # Options: xrd_transformer, gan, unet
 
-#laue params: romb, clin, all
-laue: 'clin'
-#pipeline: 'xrd_transformer', 'gan', 'unet'
-pipeline: 'gan'
+# Training Parameters
 trainer:
-  #precision: "16-mixed"
-  #sync_batchnorm: True
-  #gradient_clip_val: 1.0
   log_every_n_steps: 20
   max_epochs: 50
   num_sanity_val_steps: 0
-  accelerator: auto
-  #  accelerator: gpu
-  devices: auto
-  #  devices: [0]
-  
-weights: 
+  accelerator: auto         # Options: auto, gpu
+  devices: auto            # Options: auto, [0], [0,1], etc.
+  # precision: "16-mixed"  
+  # sync_batchnorm: True
+  # gradient_clip_val: 1.0
 
-model:
+# Model Configuration
+weights: null
+model: null
+unet_layers: 2
 
+# DataLoader Settings
 dataloader:
   batch_size: 160
   num_workers: 12
 
+# Optimizer Configuration
 optimizer: adam
 optimizer_params:
   lr: 0.001
   weight_decay: 0.0001
 
-
+# Learning Rate Scheduler
 scheduler: plateau
 scheduler_params:
   patience: 5
   factor: 0.1
   verbose: True
-  target_metric: Loss/val
+  target_metric: Loss/val   # Use g_loss/val for GAN, Loss/val for other pipelines
   mode: min
-#g_loss/val for GAN
-#Loss/val for other pipelines
+
+# Checkpoint Configuration  
 checkpoint:
   monitor: g_loss/val
   filename: model
   mode: min
 
+# Dataset indexing (None for full dataset)
+first_index: None
+max_index: None

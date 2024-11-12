@@ -122,7 +122,7 @@ class XRDTransformer(nn.Module):
                  mlp_ratio=4.,
                  drop_rate=0.1,
                  attn_drop_rate=0.1,
-                 embedding_type='learned'):  # 'learned' or 'onehot'
+                 embedding_type='onehot'):  # 'learned' or 'onehot'
         super().__init__()
         
         self.input_shape = input_shape

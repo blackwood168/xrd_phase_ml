@@ -1,8 +1,18 @@
 from torch import nn
 import torch
+
+
 class DoubleConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(DoubleConv, self).__init__()
+    """Double convolution block with batch normalization and GELU activation."""
+
+    def __init__(self, in_channels: int, out_channels: int) -> None:
+        """Initialize the double convolution block.
+        
+        Args:
+            in_channels: Number of input channels
+            out_channels: Number of output channels
+        """
+        super().__init__()
         self.double_conv = nn.Sequential(
             nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(out_channels),
@@ -12,62 +22,131 @@ class DoubleConv(nn.Module):
             nn.GELU(),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the double convolution block."""
         return self.double_conv(x)
+
+
 class DownBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(DownBlock, self).__init__()
+    """Downsampling block with double convolution and max pooling."""
+
+    def __init__(self, in_channels: int, out_channels: int) -> None:
+        """Initialize the downsampling block.
+        
+        Args:
+            in_channels: Number of input channels
+            out_channels: Number of output channels
+        """
+        super().__init__()
         self.double_conv = DoubleConv(in_channels, out_channels)
         self.down_sample = nn.MaxPool3d(2)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass of the downsampling block.
+        
+        Returns:
+            Tuple of (downsampled output, skip connection output)
+        """
         skip_out = self.double_conv(x)
         down_out = self.down_sample(skip_out)
-        return (down_out, skip_out)
+        return down_out, skip_out
+
+
 class UpBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, up_sample_mode):
-        super(UpBlock, self).__init__()
-        #if up_sample_mode == 'conv_transpose':
-        #    self.up_sample = nn.ConvTranspose3d(in_channels-out_channels, in_channels-out_channels, kernel_size=2, stride=2)
-        #elif up_sample_mode == 'trilinear':
-        #    self.up_sample = nn.Upsample(size = (8, 9, 7), mode='trilinear', align_corners=False)
-        #else:
-        #    raise ValueError("Unsupported `up_sample_mode` (can take one of `conv_transpose` or `trilinear`)")
+    """Upsampling block with double convolution and skip connections."""
+
+    def __init__(self, in_channels: int, out_channels: int, up_sample_mode: str) -> None:
+        """Initialize the upsampling block.
+        
+        Args:
+            in_channels: Number of input channels
+            out_channels: Number of output channels
+            up_sample_mode: Upsampling mode ('trilinear' only currently supported)
+        """
+        super().__init__()
         self.double_conv = DoubleConv(in_channels, out_channels)
 
-    def forward(self, down_input, skip_input):
-        x = nn.Upsample(size = skip_input.shape[2:], mode = 'trilinear', align_corners=False)(down_input)
+    def forward(self, down_input: torch.Tensor, skip_input: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the upsampling block.
+        
+        Args:
+            down_input: Input from the downsampling path
+            skip_input: Skip connection input from the corresponding downsampling block
+            
+        Returns:
+            Upsampled and convolved output
+        """
+        x = nn.Upsample(
+            size=skip_input.shape[2:],
+            mode='trilinear',
+            align_corners=False
+        )(down_input)
         x = torch.cat([x, skip_input], dim=1)
         return self.double_conv(x)
 
+
 class MiniUnet(nn.Module):
-    def __init__(self, out_classes = 1, up_sample_mode='trilinear'):
+    """Mini U-Net architecture for 3D image processing."""
+
+    def __init__(self, num_layers: int = 2, out_classes: int = 1, up_sample_mode: str = 'trilinear') -> None:
+        """Initialize the Mini U-Net model.
+        
+        Args:
+            num_layers: Number of down/up sampling layers
+            out_classes: Number of output classes/channels
+            up_sample_mode: Upsampling mode for decoder path
+        """
         super().__init__()
         self.up_sample_mode = up_sample_mode
-        # Downsampling Path
-        self.down_conv1 = DownBlock(1, 64)
-        self.down_conv2 = DownBlock(64, 128)
-        #self.down_conv3 = DownBlock(128, 256)
-        #self.down_conv4 = DownBlock(256, 512)
-        # Bottleneck
-        self.double_conv = DoubleConv(128, 256)
-        # Upsampling Path
-        #self.up_conv4 = UpBlock(512 + 1024, 512, self.up_sample_mode)
-        #self.up_conv3 = UpBlock(256 + 128, 256, self.up_sample_mode)
-        self.up_conv2 = UpBlock(256 + 128, 128, self.up_sample_mode)
-        self.up_conv1 = UpBlock(128 + 64, 64, self.up_sample_mode)
-        # Final Convolution
-        self.conv_last = nn.Conv3d(64, out_classes, kernel_size=1)
+        self.num_layers = num_layers
 
-    def forward(self, x):
-        x, skip1_out = self.down_conv1(x)
-        x, skip2_out = self.down_conv2(x)
-        #x, skip3_out = self.down_conv3(x)
-        #x, skip4_out = self.down_conv4(x)
+        # Calculate filter sizes for each layer
+        initial_filters = 64
+        self.filters = [initial_filters * (2**i) for i in range(num_layers)]
+        
+        # Encoder path
+        self.down_blocks = nn.ModuleList()
+        in_channels = 1
+        for filters in self.filters:
+            self.down_blocks.append(DownBlock(in_channels, filters))
+            in_channels = filters
+
+        # Bottleneck
+        self.double_conv = DoubleConv(self.filters[-1], self.filters[-1] * 2)
+
+        # Decoder path
+        self.up_blocks = nn.ModuleList()
+        in_channels = self.filters[-1] * 2
+        for filters in reversed(self.filters):
+            self.up_blocks.append(UpBlock(in_channels + filters, filters, self.up_sample_mode))
+            in_channels = filters
+
+        # Final convolution
+        self.conv_last = nn.Conv3d(self.filters[0], out_classes, kernel_size=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the Mini U-Net.
+        
+        Args:
+            x: Input tensor
+            
+        Returns:
+            Output tensor after passing through the U-Net
+        """
+        # Store skip connections
+        skip_connections = []
+        
+        # Encoder path
+        for down_block in self.down_blocks:
+            x, skip = down_block(x)
+            skip_connections.append(skip)
+            
+        # Bottleneck
         x = self.double_conv(x)
-        #x = self.up_conv4(x, skip4_out)
-        #x = self.up_conv3(x, skip3_out)
-        x = self.up_conv2(x, skip2_out)
-        x = self.up_conv1(x, skip1_out)
-        x = self.conv_last(x)
-        return x
+        
+        # Decoder path
+        for up_block in self.up_blocks:
+            skip = skip_connections.pop()
+            x = up_block(x, skip)
+            
+        return self.conv_last(x)

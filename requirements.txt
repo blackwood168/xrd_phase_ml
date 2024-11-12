@@ -1,1 +1,7 @@
-lightning==2.2.2
+lightning
+numpy
+torch
+pytorch-msssim
+pandas
+torchmetrics
+scipy

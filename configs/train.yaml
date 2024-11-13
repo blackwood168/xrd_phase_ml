@@ -1,6 +1,6 @@
 # Data Paths
-data_path: "/home/arthur/xray_ml/real_csd_data/real_csd/"          # For datasphere: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k" #"/home/arthur/clin_1.5_0.8_500k"
-annotation_path: "/home/arthur/xray_ml/real_csd_data/real_csd/"
+data_path: "real_csd/"          # For datasphere: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k" #"/home/arthur/clin_1.5_0.8_500k"
+annotation_path: "real_csd/"
 exp_path: "Experiments"
 
 # Training Data
@@ -12,7 +12,7 @@ val_annotations: "val.csv"
 val_images: "data"
 
 # Experiment Configuration
-exp_name: 'doob_7k_csd3'
+exp_name: 'doob_7k_csd1'
 project: 'transformer'
 laue: 'clin'                # Options: romb, clin, all
 pipeline: 'xrd_transformer'             # Options: xrd_transformer, gan, unet
@@ -36,8 +36,8 @@ fft_layers: 2
 
 # DataLoader Settings
 dataloader:
-  batch_size: 2
-  num_workers: 12
+  batch_size: 10
+  num_workers: 28
 
 # Optimizer Configuration
 optimizer: adam

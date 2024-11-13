@@ -1,0 +1,43 @@
+annotation_path: /home/arthur/xray_ml/real_csd_data/real_csd/
+annotations: train.csv
+checkpoint:
+  filename: model
+  mode: min
+  monitor: Loss/val
+data_path: /home/arthur/xray_ml/real_csd_data/real_csd/
+dataloader:
+  batch_size: 2
+  num_workers: 12
+exp_name: doob_7k_csd3
+exp_path: Experiments
+fft_layers: 2
+first_index: null
+images: data
+laue: clin
+max_index: null
+model: xrd_transformer
+optimizer: adam
+optimizer_params:
+  lr: 1.0e-05
+  weight_decay: 0.0001
+pipeline: xrd_transformer
+project: transformer
+save_path: Experiments/transformer/doob_7k_csd3
+scheduler: plateau
+scheduler_params:
+  factor: 0.1
+  mode: min
+  patience: 5
+  target_metric: Loss/val
+  verbose: true
+trainer:
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 5
+  max_epochs: 500
+  num_sanity_val_steps: 1
+  precision: 16-mixed
+unet_layers: 2
+val_annotations: val.csv
+val_images: data
+weights: weights/XRDTransformer/last.ckpt

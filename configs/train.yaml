@@ -1,6 +1,6 @@
 # Data Paths
-data_path: "/home/arthur/clin_1.5_0.8_500k"          # For datasphere: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k"
-annotation_path: "/home/arthur/clin_1.5_0.8_500k"
+data_path: "/home/arthur/xray_ml/real_csd_data/real_csd/"          # For datasphere: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k" #"/home/arthur/clin_1.5_0.8_500k"
+annotation_path: "/home/arthur/xray_ml/real_csd_data/real_csd/"
 exp_path: "Experiments"
 
 # Training Data
@@ -12,36 +12,37 @@ val_annotations: "val.csv"
 val_images: "data"
 
 # Experiment Configuration
-exp_name: 'try_500k'
-project: 'GAN'
+exp_name: 'doob_7k_csd3'
+project: 'transformer'
 laue: 'clin'                # Options: romb, clin, all
-pipeline: 'gan'             # Options: xrd_transformer, gan, unet
+pipeline: 'xrd_transformer'             # Options: xrd_transformer, gan, unet
 
 # Training Parameters
 trainer:
-  log_every_n_steps: 20
-  max_epochs: 50
-  num_sanity_val_steps: 0
+  log_every_n_steps: 5
+  max_epochs: 500
+  num_sanity_val_steps: 1
   accelerator: auto         # Options: auto, gpu
   devices: auto            # Options: auto, [0], [0,1], etc.
-  # precision: "16-mixed"  
+  precision: "16-mixed"  
   # sync_batchnorm: True
   # gradient_clip_val: 1.0
 
 # Model Configuration
-weights: null
-model: null
+weights: "weights/XRDTransformer/last.ckpt"
+model: 'xrd_transformer'
 unet_layers: 2
+fft_layers: 2
 
 # DataLoader Settings
 dataloader:
-  batch_size: 160
+  batch_size: 2
   num_workers: 12
 
 # Optimizer Configuration
 optimizer: adam
 optimizer_params:
-  lr: 0.001
+  lr: 0.00001
   weight_decay: 0.0001
 
 # Learning Rate Scheduler
@@ -55,10 +56,10 @@ scheduler_params:
 
 # Checkpoint Configuration  
 checkpoint:
-  monitor: g_loss/val
+  monitor: Loss/val
   filename: model
   mode: min
 
 # Dataset indexing (None for full dataset)
-first_index: None
-max_index: None
+first_index: 
+max_index: 

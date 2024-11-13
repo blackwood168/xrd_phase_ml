@@ -81,11 +81,13 @@ class TrainDataset(Dataset):
         # Fill arrays with intensity values
         for j, ind in enumerate(ind_high):
             h, k, l = ind
-            high[0, self.h2ind[h], self.k2ind[k], self.l2ind[l]] = intensity[j]
+            if h in self.h2ind.keys() and k in self.k2ind.keys() and l in self.l2ind.keys():
+                high[0, self.h2ind[h], self.k2ind[k], self.l2ind[l]] = intensity[j]
             
         for ind in ind_low:
             h, k, l = ind
-            low[0, self.h2ind[h], self.k2ind[k], self.l2ind[l]] = high[0, self.h2ind[h], self.k2ind[k], self.l2ind[l]]
+            if h in self.h2ind.keys() and k in self.k2ind.keys() and l in self.l2ind.keys():
+                low[0, self.h2ind[h], self.k2ind[k], self.l2ind[l]] = high[0, self.h2ind[h], self.k2ind[k], self.l2ind[l]]
 
         # Normalize
         low = np.sqrt(low)

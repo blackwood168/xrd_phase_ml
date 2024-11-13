@@ -92,7 +92,7 @@ class XRDTransformerPipeline(L.LightningModule):
     def training_step(self, batch, batch_idx):
         """Execute a single training step."""
         x, y = batch
-        out = self.model(x)
+        out = torch.nn.functional.relu(self.model(x))
         
         # Calculate losses
         loss = self.criterion(out, y)
@@ -116,7 +116,7 @@ class XRDTransformerPipeline(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         """Execute a single validation step."""
         x, y = batch
-        out = self.model(x)
+        out = torch.nn.functional.relu(self.model(x))
         
         # Calculate losses
         loss = self.criterion(out, y)
@@ -340,7 +340,10 @@ class TrainPipeline(L.LightningModule):
         self.config = config
 
         # Initialize model
-        self.model = MiniUnet(config['unet_layers'])
+        if self.config['model'] == 'fft':
+            self.model = unet_fft.UNet_FFT(config['fft_layers'])
+        else:
+            self.model = MiniUnet(config['unet_layers'])
         
         # Load pre-trained weights if specified
         if config['weights'] is not None:
@@ -438,8 +441,8 @@ class TrainPipeline(L.LightningModule):
         x, y = batch
         out = self.model(x)
         mask = x == 0
-        out = out * mask + x
-        
+        out = out * mask + ~mask*x
+        out = torch.nn.functional.relu(out)
         # Calculate loss
         loss = self.criterion(out, y)
         self.log("Loss/train", loss, prog_bar=True)
@@ -462,8 +465,8 @@ class TrainPipeline(L.LightningModule):
         x, y = batch
         out = self.model(x)
         mask = x == 0
-        out = out * mask + x
-        
+        out = out * mask + ~mask*x
+        out = torch.nn.functional.relu(out)
         # Calculate loss
         loss = self.criterion(out, y)
         self.log("Loss/val", loss, prog_bar=True)
@@ -506,7 +509,10 @@ class TestPipeline(L.LightningModule):
         
         # Initialize model and metrics
         self.criterion = TorchLoss()
-        self.model = MiniUnet(config['unet_layers'])
+        if self.config['model'] == 'fft':
+            self.model = unet_fft.UNet_FFT(config['fft_layers'])
+        else:
+            self.model = MiniUnet(config['unet_layers'])
         self.ssim = SSIM(
             data_range=1,
             size_average=True,
@@ -588,7 +594,7 @@ class TestPipeline(L.LightningModule):
     def test_step(self, batch):
         """Execute a single test step."""
         x, y = batch
-        out = self.model(x)
+        out = torch.nn.functional.relu(self.model(x))
         
         # Calculate initial loss
         self.test_outputs.append(self.criterion(y, out).cpu().numpy())
@@ -686,6 +692,7 @@ class XRDTransformerTestPipeline(L.LightningModule):
         
         # Forward pass through model
         out = self.model(x)
+        out = torch.nn.functional.relu(out)  # Apply ReLU activation
         
         # Calculate initial loss
         self.test_outputs.append(self.criterion(y, out).cpu().numpy())

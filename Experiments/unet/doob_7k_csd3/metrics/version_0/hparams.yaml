@@ -1,0 +1,42 @@
+annotation_path: /home/arthur/xray_ml/real_csd_data/real_csd/
+annotations: train.csv
+checkpoint:
+  filename: model
+  mode: min
+  monitor: Loss/val
+data_path: /home/arthur/xray_ml/real_csd_data/real_csd/
+dataloader:
+  batch_size: 220
+  num_workers: 8
+exp_name: doob_7k_csd3
+exp_path: Experiments
+fft_layers: 2
+first_index: null
+images: data
+laue: clin
+max_index: null
+model: unet
+optimizer: adam
+optimizer_params:
+  lr: 1.5625e-06
+  weight_decay: 0.0001
+pipeline: unet
+project: unet
+save_path: Experiments/unet/doob_7k_csd3
+scheduler: plateau
+scheduler_params:
+  factor: 0.1
+  mode: min
+  patience: 5
+  target_metric: Loss/val
+  verbose: true
+trainer:
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 5
+  max_epochs: 500
+  num_sanity_val_steps: 1
+unet_layers: 2
+val_annotations: val.csv
+val_images: data
+weights: Experiments/unet/doob_7k_csd2/last.ckpt

@@ -20,17 +20,18 @@ trainer:
   # precision: 32      # Uncomment to enable 32-bit precision
 
 # Model configuration  
-model: "xrd_transformer"
+model: "unet"
 unet_layers: 2
-pipeline: "xrd_transformer"
-weights: "weights/XRDTransformer/model.ckpt"
+fft_layers: 2
+pipeline: "unet"
+weights: "weights/UNet/model.ckpt"
 enable_post2: false    # Post-processing step 2 (currently disabled)
 
 # DataLoader settings
 dataloader:
-  batch_size: 4
+  batch_size: 200
   num_workers: 8
 
 # Dataset indexing (None for full dataset)
-first_index: None
-max_index: None
+first_index: 
+max_index: 

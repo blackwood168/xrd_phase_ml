@@ -1,6 +1,6 @@
 # Data Paths
-data_path: "real_csd/"          # For datasphere: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k" #"/home/arthur/clin_1.5_0.8_500k"
-annotation_path: "real_csd/"
+data_path: "/home/arthur/xray_ml/real_csd_data/real_csd/"        # For datasphere: "/home/jupyter/datasphere/datasets/mono_500k/clin_1.5_0.8_500k" #"/home/arthur/clin_1.5_0.8_500k"
+annotation_path: "/home/arthur/xray_ml/real_csd_data/real_csd/" #"/home/arthur/xray_ml/real_csd_data/real_csd/"  
 exp_path: "Experiments"
 
 # Training Data
@@ -12,10 +12,10 @@ val_annotations: "val.csv"
 val_images: "data"
 
 # Experiment Configuration
-exp_name: 'doob_7k_csd1'
-project: 'transformer'
+exp_name: '16train_doob'
+project: 'fft_doob'
 laue: 'clin'                # Options: romb, clin, all
-pipeline: 'xrd_transformer'             # Options: xrd_transformer, gan, unet
+pipeline: 'unet'             # Options: xrd_transformer, gan, unet
 
 # Training Parameters
 trainer:
@@ -24,32 +24,32 @@ trainer:
   num_sanity_val_steps: 1
   accelerator: auto         # Options: auto, gpu
   devices: auto            # Options: auto, [0], [0,1], etc.
-  precision: "16-mixed"  
+  #precision: "16-mixed"  
   # sync_batchnorm: True
   # gradient_clip_val: 1.0
 
 # Model Configuration
-weights: "weights/XRDTransformer/last.ckpt"
-model: 'xrd_transformer'
+weights: "Experiments/fft/16train/model.ckpt"
+model: 'fft'
 unet_layers: 2
 fft_layers: 2
 
 # DataLoader Settings
 dataloader:
-  batch_size: 10
-  num_workers: 28
+  batch_size: 100
+  num_workers: 12
 
 # Optimizer Configuration
 optimizer: adam
 optimizer_params:
-  lr: 0.00001
+  lr: 0.001
   weight_decay: 0.0001
 
 # Learning Rate Scheduler
 scheduler: plateau
 scheduler_params:
-  patience: 5
-  factor: 0.1
+  patience: 2
+  factor: 0.5
   verbose: True
   target_metric: Loss/val   # Use g_loss/val for GAN, Loss/val for other pipelines
   mode: min

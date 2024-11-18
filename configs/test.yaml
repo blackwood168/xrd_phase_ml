@@ -1,13 +1,13 @@
 # Main paths
-data_path: "/home/arthur/xray_ml/pxrd_sim/src/pxrd_simulator/clin_test"
-annotation_path: "/home/arthur/xray_ml/pxrd_sim/src/pxrd_simulator/clin_test"
+data_path: 'xrd_datasets/toy_csd'
+annotation_path: 'xrd_datasets/toy_csd'
 
 # Dataset configuration
 annotations: "test.csv"
 images: "data"
 
 # Experiment parameters
-save_path: "Experiments/test/pxrd_transformer"
+save_path: "Experiments/test/unet_fft"
 test_name: "test"
 
 # Laue group (options: romb, clin, all)
@@ -20,18 +20,18 @@ trainer:
   # precision: 32      # Uncomment to enable 32-bit precision
 
 # Model configuration  
-model: "unet"
+model: "fft" #Options: transformer, fft, unet
 unet_layers: 2
 fft_layers: 2
-pipeline: "unet"
-weights: "weights/UNet/model.ckpt"
+pipeline: "unet"  # Options: xrd_transformer, gan, unet
+weights: "weights/FFT_UNet/synth+csd/model.ckpt"
 enable_post2: false    # Post-processing step 2 (currently disabled)
 
 # DataLoader settings
 dataloader:
-  batch_size: 200
+  batch_size: 2
   num_workers: 8
 
-# Dataset indexing (None for full dataset)
+# Dataset indexing (Empty for full dataset)
 first_index: 
 max_index: 

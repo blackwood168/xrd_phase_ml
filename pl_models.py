@@ -620,13 +620,13 @@ class TestPipeline(L.LightningModule):
 
     def on_test_epoch_end(self):
         """Compute and log test metrics at the end of the epoch."""
-        print(f'Without preprocessing: {np.mean(self.test_outputs)}')
-        print(f'With preprocessing 1: {np.mean(self.test_outputs_pre1)}')
+        print(f'Without preprocessing: {np.mean(self.test_outputs)},{np.std(self.test_outputs)}')
+        print(f'With preprocessing 1: {np.mean(self.test_outputs_pre1)},{np.std(self.test_outputs_pre1)}')
         if self.config.get('enable_post2', False):
             print(f'With preprocessing 1 + 2: {np.mean(self.test_outputs_pre2)}')
-        print(f'MSE: {np.mean(self.mses)}')
-        print(f'SSIM: {np.mean(self.ssims)}')
-        print(f'R-factor: {np.mean(self.R_factors)}')
+        print(f'MSE: {np.mean(self.mses)}, {np.std(self.mses)}')
+        print(f'SSIM: {np.mean(self.ssims)}, {np.std(self.ssims)}')
+        print(f'R-factor: {np.mean(self.R_factors)}, {np.std(self.R_factors)}')
 
 
 class XRDTransformerTestPipeline(L.LightningModule):
@@ -713,8 +713,8 @@ class XRDTransformerTestPipeline(L.LightningModule):
 
     def on_test_epoch_end(self):
         """Compute and log test metrics at the end of the epoch."""
-        print(f'Raw output loss: {np.mean(self.test_outputs)}')
-        print(f'Post-processed loss: {np.mean(self.test_outputs_pre1)}')
-        print(f'MSE: {np.mean(self.mses)}')
-        print(f'SSIM: {np.mean(self.ssims)}')
-        print(f'R-factor: {np.mean(self.R_factors)}')
+        print(f'Raw output loss: {np.mean(self.test_outputs)} pm {np.std(self.test_outputs)}')
+        print(f'Post-processed loss: {np.mean(self.test_outputs_pre1)} pm {np.std(self.test_outputs_pre1)}')
+        print(f'MSE: {np.mean(self.mses)} pm {np.std(self.mses)}')
+        print(f'SSIM: {np.mean(self.ssims)} pm {np.std(self.ssims)}')
+        print(f'R-factor: {np.mean(self.R_factors)} pm {np.std(self.R_factors)}')

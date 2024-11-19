@@ -16,7 +16,7 @@ The X-Ray Diffraction (XRD) phase problem arises from the inability to directly 
 In this project, we aim to solve this problem by reconstructing the complete structure factors using deep learning approaches. The key aspects are:
 
 - **📥 Input Data**: We work with calculated XRD structure factor modules organized in reciprocal space coordinates (h,k,l) (d_min = 1.5 Å)
-- **🎯 Target**: Complete set of structure factor modules (d_min = 1.5 Å)
+- **🎯 Target**: Complete set of structure factor modules (d_min = 0.8 Å)
 - **🏗️ Model Architectures**:
   - FFT_UNet: For direct spatial feature extraction, upsampling, and Fourier transform processing
   - Transformer: To capture long-range dependencies in reciprocal space
@@ -62,7 +62,7 @@ Performance is evaluated using three key metrics:
 3. Structural Similarity Index (SSIM) - For structural similarity assessment, not really used because of not locally bounded data
 
 ## 📈 Results
-The framework was trained and tested on a diverse set of monoclinic crystal structures from the Cambridge Structural Database (CSD) and generated synthetic data by our own generator ([XRD Simulator](https://github.com/blackwood168/xrd_simulator)). The final results of testing on CSD structures are:
+The framework was trained and tested on a diverse set of monoclinic crystal structures (group P21/c, C2) from the Cambridge Structural Database (CSD) and generated synthetic data by our own generator ([XRD Simulator](https://github.com/blackwood168/xrd_simulator)). The final results of testing on CSD structures are:
 
 | Metric | UNet | FFT_UNet | XRD_Transformer |
 |--------|------|----------|-----------------|

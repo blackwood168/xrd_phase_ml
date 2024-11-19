@@ -11,7 +11,6 @@ import torch.nn as nn
 
 from losses.loss import TorchLoss
 from models.model import MiniUnet, UpBlock, DownBlock, DoubleConv
-import models.superformer as superformer
 import models.unet_fft as unet_fft
 from models.gan_model import Generator, Discriminator
 from models.xrd_transformer import XRDTransformer

@@ -51,9 +51,7 @@ The framework employs multiple deep learning approaches:
 - Architecture parameters:
   - Embedding dimension: 128
   - Depth: 5
-  - Number of heads: 4
   - MLP ratio: 4
-  - Dropout rates: 0.1
 
 ### 📊 Evaluation Metrics
 Performance is evaluated using three key metrics:

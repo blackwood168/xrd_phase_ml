@@ -1,4 +1,3 @@
-cctbx==2020.8
 lightning==2.2.2
 matplotlib==3.8.4
 numpy==2.1.3

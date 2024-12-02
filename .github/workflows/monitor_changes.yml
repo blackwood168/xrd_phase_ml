@@ -31,7 +31,7 @@ jobs:
               datasets/train.py datasets/test.py || true)
         echo "$flake8_output" > flake8_output.txt
         # Escape newlines and quotes for GitHub Actions output
-        lint_results=$(head -n 5 flake8_output.txt)
+        lint_results=$(head -n 5 flake8_output.txt | sed ':a;N;$!ba;s/\n/%0A/g' | sed 's/"/\\"/g')
         echo "lint_results=$lint_results" >> $GITHUB_OUTPUT
 
     - name: Check for changes

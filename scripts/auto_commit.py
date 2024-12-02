@@ -120,6 +120,7 @@ def main():
                     logging.info("Изменения успешно закоммичены и отправлены")
                 else:
                     logging.warning("Не удалось закоммитить изменения")
+                auto_commit.run_git_command(['git', 'checkout', 'main'])
             else:
                 logging.info("Изменений не обнаружено")
 

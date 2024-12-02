@@ -1,2 +1,3 @@
 .ipynb_checkpoints/
 scripts/cron.log
+flake8_output.txt

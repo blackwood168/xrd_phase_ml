@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
 import os
 import subprocess
-from datetime import datetime
-import time
 import logging
+from datetime import datetime
 from pathlib import Path
+import time
 
 # Настройка логирования
 logging.basicConfig(
@@ -36,27 +35,14 @@ class GitAutoCommit:
             stderr.decode('utf-8', errors='ignore')
         )
 
-    def check_large_files(self) -> list:
-        """Проверяет наличие измененных файлов больше max_file_size."""
-        _, stdout, _ = self.run_git_command(['git', 'status', '--porcelain'])
-        large_files = []
-        
-        for line in stdout.split('\n'):
-            if not line.strip():
-                continue
-                
-            # Получаем имя файла из вывода git status
-            file_path = line[3:].strip()
-            if os.path.exists(self.repo_path / file_path):
-                size = os.path.getsize(self.repo_path / file_path)
-                if size > self.max_file_size:
-                    large_files.append((file_path, size))
-                    
-        return large_files
-
     def has_changes(self) -> bool:
         """Проверяет наличие изменений в репозитории."""
-        returncode, stdout, _ = self.run_git_command(['git', 'status', '--porcelain'])
+        returncode, stdout, _ = self.run_git_command(['git', 'diff', 'main'])
+        return bool(stdout.strip())
+
+    def branch_exists(self, branch_name: str) -> bool:
+        """Проверяет, существует ли ветка."""
+        returncode, stdout, _ = self.run_git_command(['git', 'branch', '--list', branch_name])
         return bool(stdout.strip())
 
     def commit_changes(self) -> bool:
@@ -72,18 +58,18 @@ class GitAutoCommit:
 
             # Добавляем все изменения
             self.run_git_command(['git', 'add', '-A'])
-            
+
             # Создаем коммит
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             commit_msg = f"Auto commit: {timestamp}"
             returncode, _, stderr = self.run_git_command(['git', 'commit', '-m', commit_msg])
-            
+
             if returncode != 0:
                 logging.error(f"Ошибка при создании коммита: {stderr}")
                 return False
 
             # Пушим изменения
-            returncode, _, stderr = self.run_git_command(['git', 'push', 'origin', 'main'])
+            returncode, _, stderr = self.run_git_command(['git', 'push', 'origin', 'auto_commit'])
             if returncode != 0:
                 logging.error(f"Ошибка при push: {stderr}")
                 return False
@@ -95,27 +81,50 @@ class GitAutoCommit:
             logging.error(f"Ошибка при коммите изменений: {str(e)}")
             return False
 
+    def check_large_files(self) -> list:
+        """Проверяет наличие измененных файлов больше max_file_size."""
+        _, stdout, _ = self.run_git_command(['git', 'status', '--porcelain'])
+        large_files = []
+
+        for line in stdout.split('\n'):
+            if not line.strip():
+                continue
+
+            # Получаем имя файла из вывода git status
+            file_path = line[3:].strip()
+            if os.path.exists(self.repo_path / file_path):
+                size = os.path.getsize(self.repo_path / file_path)
+                if size > self.max_file_size:
+                    large_files.append((file_path, size))
+
+        return large_files
+
 def main():
     # Путь к вашему репозиторию
     REPO_PATH = "/home/arthur/xray_ml/github_actual_xrd_recon/xrd_phase_ml"  # Замените на путь к вашему репозиторию
     CHECK_INTERVAL = 3600  # Интервал проверки в секундах (1 час)
-    
+
     auto_commit = GitAutoCommit(REPO_PATH)
-    
+
     while True:
         try:
             if auto_commit.has_changes():
                 logging.info("Обнаружены изменения")
+                if auto_commit.branch_exists('auto_commit'):
+                    auto_commit.run_git_command(['git', 'checkout', 'auto_commit'])
+                else:
+                    auto_commit.run_git_command(['git', 'checkout', '-b', 'auto_commit'])
+
                 if auto_commit.commit_changes():
                     logging.info("Изменения успешно закоммичены и отправлены")
                 else:
                     logging.warning("Не удалось закоммитить изменения")
             else:
                 logging.info("Изменений не обнаружено")
-                
+
         except Exception as e:
             logging.error(f"Произошла ошибка: {str(e)}")
-            
+
         time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":

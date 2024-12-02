@@ -1,0 +1,58 @@
+name: Monitor Changes, Lint, and Send Notifications
+
+on:
+  push:
+    branches: [ auto_commit ]  # Adjust this to the branch you want to monitor
+  workflow_dispatch:
+
+jobs:
+  lint_and_notify:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install flake8
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8
+
+    - name: Run flake8
+      id: flake8
+      run: |
+        flake8 scripts/auto_commit.py pl_models.py test.py train.py \
+              models/unet_fft.py xrd_transformer.py model.py \
+              datasets/train.py datasets/test.py > flake8_output.txt || true
+
+    - name: Get commit details
+      id: commit
+      run: |
+        echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
+        echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_ENV
+        echo "files_changed=$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }})" >> $GITHUB_ENV
+
+    - name: Send Telegram Notification
+      uses: appleboy/telegram-action@master
+      with:
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        message: |
+          🔄 Новый автоматический коммит обнаружен!
+          
+          Сообщение коммита: ${{ env.message }}
+          Автор: ${{ env.author }}
+          
+          Измененные файлы:
+          ${{ env.files_changed }}
+          
+          Репозиторий: ${{ github.repository }}
+          Ссылка: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          
+          ⚠️ Результаты линтинга:
+          ${{ steps.flake8.outputs.lint_results }}

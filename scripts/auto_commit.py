@@ -11,7 +11,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('auto_commit.log'),
+        logging.FileHandler('/home/arthur/auto_commit.log'),
         logging.StreamHandler()
     ]
 )

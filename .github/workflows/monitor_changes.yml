@@ -26,10 +26,13 @@ jobs:
     - name: Run flake8
       id: flake8
       run: |
-        flake8 scripts/auto_commit.py pl_models.py test.py train.py \
-              models/unet_fft.py xrd_transformer.py model.py  kek.py\
-              datasets/train.py datasets/test.py > flake8_output.txt || true
-        echo "lint_results=$(head -n 10 flake8_output.txt)" >> $GITHUB_OUTPUT
+        flake8_output=$(flake8 scripts/auto_commit.py pl_models.py test.py train.py \
+              models/unet_fft.py xrd_transformer.py model.py kek.py \
+              datasets/train.py datasets/test.py || true)
+        echo "$flake8_output" > flake8_output.txt
+        # Escape newlines and quotes for GitHub Actions output
+        lint_results=$(head -n 10 flake8_output.txt | sed ':a;N;$!ba;s/\n/%0A/g' | sed 's/"/\\"/g')
+        echo "lint_results=$lint_results" >> $GITHUB_OUTPUT
 
     - name: Check for changes
       id: check_changes

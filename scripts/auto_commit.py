@@ -102,20 +102,19 @@ def main():
 
     auto_commit = GitAutoCommit(REPO_PATH)
 
-    while True:
-        try:
-            if auto_commit.has_changes():
-                logging.info("Обнаружены изменения")
-                if auto_commit.commit_changes():
-                    logging.info("Изменения успешно закоммичены и отправлены")
-                else:
-                    logging.warning("Не удалось закоммитить изменения")
-                #auto_commit.run_git_command(['git', 'checkout', 'main'])
+    try:
+        if auto_commit.has_changes():
+            logging.info("Обнаружены изменения")
+            if auto_commit.commit_changes():
+                logging.info("Изменения успешно закоммичены и отправлены")
             else:
-                logging.info("Изменений не обнаружено")
+                logging.warning("Не удалось закоммитить изменения")
+            #auto_commit.run_git_command(['git', 'checkout', 'main'])
+        else:
+            logging.info("Изменений не обнаружено")
 
-        except Exception as e:
-            logging.error(f"Произошла ошибка: {str(e)}\n{traceback.format_exc()}")
+    except Exception as e:
+        logging.error(f"Произошла ошибка: {str(e)}\n{traceback.format_exc()}")
 
         #time.sleep(CHECK_INTERVAL)
 

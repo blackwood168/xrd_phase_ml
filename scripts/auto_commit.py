@@ -19,7 +19,13 @@ logging.basicConfig(
 class GitAutoCommit:
     def __init__(self, repo_path: str):
         self.repo_path = Path(repo_path)
-        self.max_file_size = 150 * 1024 * 1024  # 150 MB в байтах
+        self.max_file_size = 15 * 1024 * 1024  # 15 MB in bytes
+        self.excluded_paths = ['Experiments']
+
+    def should_exclude_file(self, file_path: str) -> bool:
+        """Проверяет, должен ли файл быть исключен из коммита."""
+        path = Path(file_path)
+        return any(excluded in path.parts for excluded in self.excluded_paths)
 
     def run_git_command(self, command: list) -> tuple[int, str, str]:
         """Выполняет git команду и возвращает код возврата, stdout и stderr."""
@@ -52,8 +58,14 @@ class GitAutoCommit:
                     logging.warning(f"- {file_path}: {size/1024/1024:.2f}MB")
                 return False
 
-            # Добавляем все изменения
-            self.run_git_command(['git', 'add', '-A'])
+            # Добавляем все изменения, исключая файлы из Experiments
+            _, stdout, _ = self.run_git_command(['git', 'status', '--porcelain'])
+            for line in stdout.split('\n'):
+                if not line.strip():
+                    continue
+                file_path = line[3:].strip()
+                if not self.should_exclude_file(file_path):
+                    self.run_git_command(['git', 'add', file_path])
 
             # Создаем коммит
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

@@ -17,6 +17,27 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.x'
+    
+    - name: Get Commit Details
+      id: commit_details
+      run: |
+        # Escape special characters in commit message
+        message=$(git log -1 --pretty=%B | sed 's/"/\\"/g')
+        author=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
+        echo "message=$message" >> $GITHUB_OUTPUT 
+        echo "author=$author" >> $GITHUB_OUTPUT
+
+    - name: Check for changes
+      id: check_changes
+      run: |
+        rm -f changes.txt
+        # Fetch both branches
+        git fetch origin main dev || true
+            
+        # Compare changes between dev and main branches
+        git diff --name-only origin/main origin/dev > changes.txt
+            
+        echo "files_changed=$(cat changes.txt)" >> $GITHUB_OUTPUT
 
     - name: Install flake8
       run: |
@@ -26,49 +47,35 @@ jobs:
     - name: Run flake8
       id: flake8
       run: |
-        flake8_output=$(flake8 scripts/auto_commit.py pl_models.py test.py train.py \
-              models/unet_fft.py xrd_transformer.py model.py \
-              datasets/train.py datasets/test.py || true)
-        echo "$flake8_output" > flake8_output.txt
-        # Escape newlines and quotes for GitHub Actions output
-        lint_results=$(head -n 5 flake8_output.txt | sed ':a;N;$!ba;s/\n/%0A/g' | sed 's/"/\\"/g')
-        echo "lint_results=$lint_results" >> $GITHUB_OUTPUT
-
-    - name: Check for changes
-      id: check_changes
-      run: |
-        # Fetch both branches
-        git fetch origin main dev || true
-          
-        # Compare changes between dev and main branches
-        git diff --name-only origin/main origin/dev > changes.txt
-          
-        # Filter files smaller than 150 MB and check if they exist
-        while IFS= read -r file; do
+        # Check if files exist before running flake8
+        files_to_lint=(
+          "scripts/auto_commit.py"
+          "pl_models.py"
+          "test.py"
+          "train.py"
+          "models/unet_fft.py"
+          "xrd_transformer.py"
+          "model.py"
+          "datasets/train.py"
+          "datasets/test.py"
+        )
+        existing_files=()
+        for file in "${files_to_lint[@]}"; do
           if [ -f "$file" ]; then
-            filesize=$(du -b "$file" 2>/dev/null | cut -f1)
-            if [ -n "$filesize" ] && [ "$filesize" -lt 150000000 ]; then
-              echo "$file" >> small_changes.txt
-            fi
+            existing_files+=("$file")
           fi
-        done < changes.txt
-          
-        if [ -f small_changes.txt ] && [ -s small_changes.txt ]; then
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "files_changed=$(cat small_changes.txt)" >> $GITHUB_OUTPUT
+        done
+        
+        if [ ${#existing_files[@]} -eq 0 ]; then
+          echo "lint_results=No Python files found to lint" >> $GITHUB_OUTPUT
         else
-          echo "has_changes=false" >> $GITHUB_OUTPUT
-          echo "files_changed=No valid changes found" >> $GITHUB_OUTPUT
+          flake8_output=$(flake8 "${existing_files[@]}" || true)
+          echo "$flake8_output" > flake8_output.txt
+          lint_results=$(head -n 5 flake8_output.txt | sed ':a;N;$!ba;s/\n/%0A/g' | sed 's/"/\\"/g')
+          echo "lint_results=$lint_results" >> $GITHUB_OUTPUT
         fi
 
-    - name: Get Commit Details
-      id: commit_details
-      run: |
-          # Экранируем специальные символы в сообщении коммита
-          message=$(git log -1 --pretty=%B | sed 's/"/\\"/g')
-          author=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
-          echo "message=$message" >> $GITHUB_OUTPUT 
-          echo "author=$author" >> $GITHUB_OUTPUT
+
 
     - name: Send Telegram Notification
       if: always()

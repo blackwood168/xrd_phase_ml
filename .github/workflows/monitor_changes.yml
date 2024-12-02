@@ -27,15 +27,15 @@ jobs:
       id: flake8
       run: |
         flake8 scripts/auto_commit.py pl_models.py test.py train.py \
-              models/unet_fft.py models/xrd_transformer.py models/model.py \
+              models/unet_fft.py xrd_transformer.py model.py \
               datasets/train.py datasets/test.py > flake8_output.txt || true
 
     - name: Get commit details
       id: commit
       run: |
-        echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
-        echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
-        echo "files_changed=$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }})" >> $GITHUB_OUTPUT
+        echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
+        echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_ENV
+        echo "files_changed=$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }})" >> $GITHUB_ENV
 
     - name: Send Telegram Notification
       uses: appleboy/telegram-action@master
@@ -45,11 +45,11 @@ jobs:
         message: |
           🔄 Новый автоматический коммит обнаружен!
           
-          Сообщение коммита: ${{ steps.commit.outputs.message }}
-          Автор: ${{ steps.commit.outputs.author }}
+          Сообщение коммита: ${{ env.message }}
+          Автор: ${{ env.author }}
           
           Измененные файлы:
-          ${{ steps.commit.outputs.files_changed }}
+          ${{ env.files_changed }}
           
           Репозиторий: ${{ github.repository }}
           Ссылка: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}

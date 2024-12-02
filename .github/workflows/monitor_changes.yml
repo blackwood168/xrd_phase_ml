@@ -17,6 +17,28 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.x'
+    
+    - name: Get Commit Details
+      id: commit_details
+      run: |
+        # Escape special characters in commit message
+        message=$(git log -1 --pretty=%B | sed 's/"/\\"/g')
+        author=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
+        echo "message=$message" >> $GITHUB_OUTPUT 
+        echo "author=$author" >> $GITHUB_OUTPUT
+
+    - name: Check for changes
+      id: check_changes
+      run: |
+        rm -f changes.txt
+        # Fetch both branches
+        git fetch origin main dev || true
+            
+        # Compare changes between dev and main branches
+        git diff --name-only origin/main origin/dev > changes.txt
+            
+        changes=$(cat changes.txt | tr '\n' ', ' | sed 's/,$//')
+        echo "files_changed=$changes" >> $GITHUB_OUTPUT
 
     - name: Install flake8
       run: |
@@ -26,43 +48,38 @@ jobs:
     - name: Run flake8
       id: flake8
       run: |
-        flake8 scripts/auto_commit.py pl_models.py test.py train.py \
-              models/unet_fft.py xrd_transformer.py model.py  kek.py\
-              datasets/train.py datasets/test.py > flake8_output.txt || true
-        echo "lint_results=$(head -n 10 flake8_output.txt)" >> $GITHUB_OUTPUT
-
-    - name: Check for changes
-      id: check_changes
-      run: |
-        # Получаем изменения из dev ветки
-        git fetch origin dev
-
-        # Проверяем изменения в репозитории (проверка только на небольшие файлы < 150 MB)
-        git diff --name-only origin/dev > changes.txt
-
-        # Фильтруем файлы, размер которых меньше 150 МБ
-        awk '{
-          "du -b " $1 "| awk \047{if ($1 < 150000000) print $0}\047" | getline size;
-          if (size != "") print $1
-        }' changes.txt > small_changes.txt
-
-        if [ -s small_changes.txt ]; then
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "files_changed=$(cat changes.txt)" >> $GITHUB_OUTPUT
+        # Check if files exist before running flake8
+        files_to_lint=(
+          "scripts/auto_commit.py"
+          "pl_models.py"
+          "test.py"
+          "train.py"
+          "models/unet_fft.py"
+          "xrd_transformer.py"
+          "model.py"
+          "datasets/train.py"
+          "datasets/test.py"
+        )
+        existing_files=()
+        for file in "${files_to_lint[@]}"; do
+          if [ -f "$file" ]; then
+            existing_files+=("$file")
+          fi
+        done
+        
+        if [ ${#existing_files[@]} -eq 0 ]; then
+          echo "lint_results=No Python files found to lint" >> $GITHUB_OUTPUT
         else
-          echo "has_changes=false" >> $GITHUB_OUTPUT
+          flake8_output=$(flake8 "${existing_files[@]}" || true)
+          echo "$flake8_output" > flake8_output.txt
+          lint_results=$(head -n 5 flake8_output.txt | sed ':a;N;$!ba;s/\n/%0A/g' | sed 's/"/\\"/g')
+          echo "lint_results=$lint_results" >> $GITHUB_OUTPUT
         fi
 
-    - name: Get Commit Details
-      id: commit_details
-      run: |
-          # Экранируем специальные символы в сообщении коммита
-          message=$(git log -1 --pretty=%B | sed 's/"/\\"/g')
-          author=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
-          echo "message=$message" >> $GITHUB_OUTPUT 
-          echo "author=$author" >> $GITHUB_OUTPUT
+
 
     - name: Send Telegram Notification
+      if: always()
       uses: appleboy/telegram-action@master
       with:
         to: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -70,7 +87,7 @@ jobs:
         message: |
           🔄 Новые изменения обнаружены!
           
-          Сообщение коммита: ${ steps.commit_details.outputs.message || 'Нет сообщения' }
+          Сообщение коммита: ${{ steps.commit_details.outputs.message || 'Нет сообщения' }}
           Автор: ${{ steps.commit_details.outputs.author || 'Неизвестный автор' }}
           
           Измененные файлы:

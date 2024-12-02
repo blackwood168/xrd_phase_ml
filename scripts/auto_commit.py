@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 import time
+import traceback
 
 # Настройка логирования
 logging.basicConfig(
@@ -78,7 +79,7 @@ class GitAutoCommit:
             return True
 
         except Exception as e:
-            logging.error(f"Ошибка при коммите изменений: {str(e)}")
+            logging.error(f"Ошибка при коммите изменений: {str(e)}\n{traceback.format_exc()}")
             return False
 
     def check_large_files(self) -> list:
@@ -123,7 +124,7 @@ def main():
                 logging.info("Изменений не обнаружено")
 
         except Exception as e:
-            logging.error(f"Произошла ошибка: {str(e)}")
+            logging.error(f"Произошла ошибка: {str(e)}\n{traceback.format_exc()}")
 
         time.sleep(CHECK_INTERVAL)
 

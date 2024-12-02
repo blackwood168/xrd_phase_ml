@@ -98,7 +98,7 @@ class GitAutoCommit:
 def main():
     # Путь к вашему репозиторию
     REPO_PATH = "/home/arthur/xray_ml/github_actual_xrd_recon/xrd_phase_ml"  # Замените на путь к вашему репозиторию
-    CHECK_INTERVAL = 60  # Интервал проверки в секундах (1 час)
+    CHECK_INTERVAL = 3600  # Интервал проверки в секундах (1 час)
     
     auto_commit = GitAutoCommit(REPO_PATH)
     

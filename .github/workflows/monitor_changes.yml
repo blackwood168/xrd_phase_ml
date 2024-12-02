@@ -2,7 +2,7 @@ name: Monitor Changes, Lint, and Send Notifications
 
 on:
   push:
-    branches: [ auto_commit ]  # Adjust this to the branch you want to monitor
+    branches: [ auto_commits ]  # Adjust this to the branch you want to monitor
   workflow_dispatch:
 
 jobs:
@@ -33,11 +33,11 @@ jobs:
     - name: Check for changes
       id: check_changes
       run: |
-        # Получаем изменения из auto_commit ветки
-        git fetch origin auto_commit
+        # Получаем изменения из auto_commits ветки
+        git fetch origin auto_commits
 
         # Проверяем изменения в репозитории (проверка только на небольшие файлы < 150 MB)
-        git diff --name-only origin/auto_commit > changes.txt
+        git diff --name-only origin/auto_commits > changes.txt
 
         # Фильтруем файлы, размер которых меньше 150 МБ
         awk '{

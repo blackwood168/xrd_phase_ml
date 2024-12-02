@@ -31,19 +31,19 @@ jobs:
               datasets/train.py datasets/test.py || true)
         echo "$flake8_output" > flake8_output.txt
         # Escape newlines and quotes for GitHub Actions output
-        lint_results=$(head -n 10 flake8_output.txt | sed ':a;N;$!ba;s/\n/%0A/g' | sed 's/"/\\"/g')
+        lint_results=$(head -n 5 flake8_output.txt)
         echo "lint_results=$lint_results" >> $GITHUB_OUTPUT
 
     - name: Check for changes
       id: check_changes
       run: |
-        # Получаем изменения из main ветки
-        git fetch origin main
+        # Fetch both branches
+        git fetch origin main dev
 
-        # Проверяем изменения в репозитории (проверка только на небольшие файлы < 150 MB)
-        git diff --name-only origin/dev > changes.txt
+        # Compare changes between dev and main branches (only files < 150 MB)
+        git diff --name-only origin/main origin/dev > changes.txt
 
-        # Фильтруем файлы, размер которых меньше 150 МБ
+        # Filter files smaller than 150 MB
         awk '{
           "du -b " $1 "| awk \047{if ($1 < 150000000) print $0}\047" | getline size;
           if (size != "") print $1

@@ -27,7 +27,7 @@ jobs:
       id: flake8
       run: |
         flake8 scripts/auto_commit.py pl_models.py test.py train.py \
-              models/unet_fft.py xrd_transformer.py model.py \
+              models/unet_fft.py xrd_transformer.py model.py  kek.py\
               datasets/train.py datasets/test.py > flake8_output.txt || true
 
     - name: Check for changes

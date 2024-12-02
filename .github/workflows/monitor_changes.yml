@@ -28,7 +28,7 @@ jobs:
       run: |
         flake8_output=$(flake8 scripts/auto_commit.py pl_models.py test.py train.py \
               models/unet_fft.py xrd_transformer.py model.py \
-              datasets/train.py kek.py datasets/test.py || true)
+              datasets/train.py datasets/test.py || true)
         echo "$flake8_output" > flake8_output.txt
         # Escape newlines and quotes for GitHub Actions output
         lint_results=$(head -n 5 flake8_output.txt | sed ':a;N;$!ba;s/\n/%0A/g' | sed 's/"/\\"/g')

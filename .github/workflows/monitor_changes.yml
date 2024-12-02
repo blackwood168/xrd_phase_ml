@@ -27,8 +27,8 @@ jobs:
       id: flake8
       run: |
         flake8_output=$(flake8 scripts/auto_commit.py pl_models.py test.py train.py \
-              models/unet_fft.py xrd_transformer.py model.py kek.py \
-              datasets/train.py datasets/test.py || true)
+              models/unet_fft.py xrd_transformer.py model.py \
+              datasets/train.py kek.py datasets/test.py || true)
         echo "$flake8_output" > flake8_output.txt
         # Escape newlines and quotes for GitHub Actions output
         lint_results=$(head -n 5 flake8_output.txt | sed ':a;N;$!ba;s/\n/%0A/g' | sed 's/"/\\"/g')
@@ -38,7 +38,7 @@ jobs:
       id: check_changes
       run: |
         # Fetch both branches
-        git fetch origin main dev
+        git fetch origin main dev || true
 
         # Compare changes between dev and main branches (only files < 150 MB)
         git diff --name-only origin/main origin/dev > changes.txt
@@ -51,7 +51,7 @@ jobs:
 
         if [ -s small_changes.txt ]; then
           echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "files_changed=$(cat changes.txt)" >> $GITHUB_OUTPUT
+          echo "files_changed=$(cat small_changes.txt)" >> $GITHUB_OUTPUT
         else
           echo "has_changes=false" >> $GITHUB_OUTPUT
         fi
@@ -66,6 +66,7 @@ jobs:
           echo "author=$author" >> $GITHUB_OUTPUT
 
     - name: Send Telegram Notification
+      if: always()
       uses: appleboy/telegram-action@master
       with:
         to: ${{ secrets.TELEGRAM_CHAT_ID }}

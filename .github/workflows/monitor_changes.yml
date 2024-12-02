@@ -29,7 +29,8 @@ jobs:
         flake8 scripts/auto_commit.py pl_models.py test.py train.py \
               models/unet_fft.py xrd_transformer.py model.py  kek.py\
               datasets/train.py datasets/test.py > flake8_output.txt || true
-        echo "lint_results=$(cat flake8_output.txt)"
+        echo "lint_results=$(cat flake8_output.txt)" >> $GITHUB_OUTPUT
+
     - name: Check for changes
       id: check_changes
       run: |
@@ -46,16 +47,17 @@ jobs:
         }' changes.txt > small_changes.txt
 
         if [ -s small_changes.txt ]; then
-          echo "has_changes=true"
-          echo "files_changed=$(cat changes.txt)"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "files_changed=$(cat changes.txt)" >> $GITHUB_OUTPUT
         else
-          echo "has_changes=false"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
         fi
+
     - name: Get Commit Details
       id: commit_details
       run: |
-        echo "message=$(git log -1 --pretty=%B)"
-        echo "author=$(git log -1 --pretty=%an)"
+        echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+        echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
 
     - name: Send Telegram Notification
       uses: appleboy/telegram-action@master

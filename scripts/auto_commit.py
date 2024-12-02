@@ -38,12 +38,7 @@ class GitAutoCommit:
 
     def has_changes(self) -> bool:
         """Проверяет наличие изменений в репозитории."""
-        returncode, stdout, _ = self.run_git_command(['git', 'diff', 'main'])
-        return bool(stdout.strip())
-
-    def branch_exists(self, branch_name: str) -> bool:
-        """Проверяет, существует ли ветка."""
-        returncode, stdout, _ = self.run_git_command(['git', 'branch', '--list', branch_name])
+        returncode, stdout, _ = self.run_git_command(['git', 'diff', 'dev'])
         return bool(stdout.strip())
 
     def commit_changes(self) -> bool:
@@ -70,7 +65,7 @@ class GitAutoCommit:
                 return False
 
             # Пушим изменения
-            returncode, _, stderr = self.run_git_command(['git', 'push', 'origin', 'auto_comm'])
+            returncode, _, stderr = self.run_git_command(['git', 'push', 'origin', 'dev'])
             if returncode != 0:
                 logging.error(f"Ошибка при push: {stderr}")
                 return False
@@ -103,7 +98,7 @@ class GitAutoCommit:
 def main():
     # Путь к вашему репозиторию
     REPO_PATH = "/home/arthur/xray_ml/github_actual_xrd_recon/xrd_phase_ml"  # Замените на путь к вашему репозиторию
-    CHECK_INTERVAL = 3600  # Интервал проверки в секундах (1 час)
+    #CHECK_INTERVAL = 3600  # Интервал проверки в секундах (1 час)
 
     auto_commit = GitAutoCommit(REPO_PATH)
 
@@ -111,11 +106,6 @@ def main():
         try:
             if auto_commit.has_changes():
                 logging.info("Обнаружены изменения")
-                if auto_commit.branch_exists('auto_comm'):
-                    auto_commit.run_git_command(['git', 'checkout', 'auto_comm'])
-                else:
-                    auto_commit.run_git_command(['git', 'checkout', '-b', 'auto_comm'])
-
                 if auto_commit.commit_changes():
                     logging.info("Изменения успешно закоммичены и отправлены")
                 else:
@@ -127,7 +117,7 @@ def main():
         except Exception as e:
             logging.error(f"Произошла ошибка: {str(e)}\n{traceback.format_exc()}")
 
-        time.sleep(CHECK_INTERVAL)
+        #time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
     main()

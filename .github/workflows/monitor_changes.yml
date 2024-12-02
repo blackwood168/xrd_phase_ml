@@ -2,7 +2,7 @@ name: Monitor Changes, Lint, and Send Notifications
 
 on:
   push:
-    branches: [ auto_comm ]  # Adjust this to the branch you want to monitor
+    branches: [ dev ]  # Adjust this to the branch you want to monitor
   workflow_dispatch:
 
 jobs:
@@ -29,16 +29,16 @@ jobs:
         flake8 scripts/auto_commit.py pl_models.py test.py train.py \
               models/unet_fft.py xrd_transformer.py model.py  kek.py\
               datasets/train.py datasets/test.py > flake8_output.txt || true
-        echo "lint_results=$(cat flake8_output.txt)" >> $GITHUB_OUTPUT
+        echo "lint_results=$(head -n 10 flake8_output.txt)" >> $GITHUB_OUTPUT
 
     - name: Check for changes
       id: check_changes
       run: |
-        # Получаем изменения из auto_comm ветки
-        git fetch origin auto_comm
+        # Получаем изменения из dev ветки
+        git fetch origin dev
 
         # Проверяем изменения в репозитории (проверка только на небольшие файлы < 150 MB)
-        git diff --name-only origin/auto_comm > changes.txt
+        git diff --name-only origin/dev > changes.txt
 
         # Фильтруем файлы, размер которых меньше 150 МБ
         awk '{
@@ -68,9 +68,9 @@ jobs:
         to: ${{ secrets.TELEGRAM_CHAT_ID }}
         token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         message: |
-          🔄 Новый автоматический коммит обнаружен!
+          🔄 Новые изменения обнаружены!
           
-          Сообщение коммита: ${{ steps.commit_details.outputs.message || 'Нет сообщения' }}
+          Сообщение коммита: ${ steps.commit_details.outputs.message || 'Нет сообщения' }
           Автор: ${{ steps.commit_details.outputs.author || 'Неизвестный автор' }}
           
           Измененные файлы:

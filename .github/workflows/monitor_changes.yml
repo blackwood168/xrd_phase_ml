@@ -30,12 +30,33 @@ jobs:
               models/unet_fft.py xrd_transformer.py model.py \
               datasets/train.py datasets/test.py > flake8_output.txt || true
 
-    - name: Get commit details
-      id: commit
+    - name: Check for changes
+      id: check_changes
       run: |
-        echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
-        echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_ENV
-        echo "files_changed=$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }})" >> $GITHUB_ENV
+        # Получаем изменения из auto_commit ветки
+        git fetch origin auto_commit
+
+        # Проверяем изменения в репозитории (проверка только на небольшие файлы < 150 MB)
+        git diff --name-only origin/auto_commit > changes.txt
+
+        # Фильтруем файлы, размер которых меньше 150 МБ
+        while IFS= read -r file; do
+          if [ -f "$file" ]; then
+            size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+            if [ "$size" -lt 150000000 ]; then
+              echo "$file" >> small_changes.txt
+            fi
+          fi
+        done < changes.txt
+
+        if [ -s small_changes.txt ]; then
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          CHANGED_FILES=$(cat small_changes.txt | tr '\n' ' ')
+          echo "files_changed=$CHANGED_FILES" >> $GITHUB_OUTPUT
+        else
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "files_changed=" >> $GITHUB_OUTPUT
+        fi
 
     - name: Send Telegram Notification
       uses: appleboy/telegram-action@master

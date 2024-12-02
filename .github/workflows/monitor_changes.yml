@@ -2,7 +2,7 @@ name: Monitor Changes, Lint, and Send Notifications
 
 on:
   push:
-    branches: [ auto_commits ]  # Adjust this to the branch you want to monitor
+    branches: [ auto_comm ]  # Adjust this to the branch you want to monitor
   workflow_dispatch:
 
 jobs:
@@ -34,11 +34,11 @@ jobs:
     - name: Check for changes
       id: check_changes
       run: |
-        # Получаем изменения из auto_commits ветки
-        git fetch origin auto_commits
+        # Получаем изменения из auto_comm ветки
+        git fetch origin auto_comm
 
         # Проверяем изменения в репозитории (проверка только на небольшие файлы < 150 MB)
-        git diff --name-only origin/auto_commits > changes.txt
+        git diff --name-only origin/auto_comm > changes.txt
 
         # Фильтруем файлы, размер которых меньше 150 МБ
         awk '{
@@ -56,8 +56,11 @@ jobs:
     - name: Get Commit Details
       id: commit_details
       run: |
-        echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
-        echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
+          # Экранируем специальные символы в сообщении коммита
+          message=$(git log -1 --pretty=%B | sed 's/"/\\"/g')
+          author=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
+          echo "message=$message" >> $GITHUB_OUTPUT 
+          echo "author=$author" >> $GITHUB_OUTPUT
 
     - name: Send Telegram Notification
       uses: appleboy/telegram-action@master
@@ -67,14 +70,14 @@ jobs:
         message: |
           🔄 Новый автоматический коммит обнаружен!
           
-          Сообщение коммита: ${{ steps.commit_details.outputs.message }}
-          Автор: ${{ steps.commit_details.outputs.author }}
+          Сообщение коммита: ${{ steps.commit_details.outputs.message || 'Нет сообщения' }}
+          Автор: ${{ steps.commit_details.outputs.author || 'Неизвестный автор' }}
           
           Измененные файлы:
-          ${{ steps.check_changes.outputs.files_changed }}
+          ${{ steps.check_changes.outputs.files_changed || 'Нет измененных файлов' }}
           
           Репозиторий: ${{ github.repository }}
           Ссылка: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           
           ⚠️ Результаты линтинга:
-          ${{ steps.flake8.outputs.lint_results }}
+          ${{ steps.flake8.outputs.lint_results || 'Нет замечаний линтера' }}

@@ -70,7 +70,7 @@ class GitAutoCommit:
                 return False
 
             # Пушим изменения
-            returncode, _, stderr = self.run_git_command(['git', 'push', 'origin', 'auto_commits'])
+            returncode, _, stderr = self.run_git_command(['git', 'push', 'origin', 'auto_comm'])
             if returncode != 0:
                 logging.error(f"Ошибка при push: {stderr}")
                 return False
@@ -111,10 +111,10 @@ def main():
         try:
             if auto_commit.has_changes():
                 logging.info("Обнаружены изменения")
-                if auto_commit.branch_exists('auto_commits'):
-                    auto_commit.run_git_command(['git', 'checkout', 'auto_commits'])
+                if auto_commit.branch_exists('auto_comm'):
+                    auto_commit.run_git_command(['git', 'checkout', 'auto_comm'])
                 else:
-                    auto_commit.run_git_command(['git', 'checkout', '-b', 'auto_commits'])
+                    auto_commit.run_git_command(['git', 'checkout', '-b', 'auto_comm'])
 
                 if auto_commit.commit_changes():
                     logging.info("Изменения успешно закоммичены и отправлены")

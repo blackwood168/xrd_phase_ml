@@ -20,7 +20,7 @@ class GitAutoCommit:
     def __init__(self, repo_path: str):
         self.repo_path = Path(repo_path)
         self.max_file_size = 15 * 1024 * 1024  # 15 MB in bytes
-        self.excluded_paths = ['Experiments']
+        self.excluded_paths = ['Experiments','experiments', 'configs', 'interaction.ipynb']
 
     def should_exclude_file(self, file_path: str) -> bool:
         """Проверяет, должен ли файл быть исключен из коммита."""

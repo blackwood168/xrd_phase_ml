@@ -45,7 +45,17 @@ class GitAutoCommit:
     def has_changes(self) -> bool:
         """Проверяет наличие изменений в репозитории."""
         returncode, stdout, _ = self.run_git_command(['git', 'diff', 'dev'])
-        return bool(stdout.strip())
+        if not stdout.strip():
+            return False
+            
+        # Get list of changed files
+        _, status_out, _ = self.run_git_command(['git', 'status', '--porcelain'])
+        changed_files = [line[3:].strip() for line in status_out.split('\n') if line.strip()]
+        
+        # Check if all changed files should be excluded
+        all_excluded = all(self.should_exclude_file(file) for file in changed_files)
+        
+        return not all_excluded
 
     def commit_changes(self) -> bool:
         """Создает коммит с текущими изменениями."""

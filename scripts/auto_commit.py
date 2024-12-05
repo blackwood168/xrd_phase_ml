@@ -118,9 +118,7 @@ class GitAutoCommit:
         return large_files
 
 def main():
-    # Путь к вашему репозиторию
-    REPO_PATH = "/home/arthur/xray_ml/github_actual_xrd_recon/xrd_phase_ml"  # Замените на путь к вашему репозиторию
-    #CHECK_INTERVAL = 3600  # Интервал проверки в секундах (1 час)
+    REPO_PATH = "/home/arthur/xray_ml/github_actual_xrd_recon/xrd_phase_ml"
 
     auto_commit = GitAutoCommit(REPO_PATH)
 
@@ -138,7 +136,6 @@ def main():
     except Exception as e:
         logging.error(f"Произошла ошибка: {str(e)}\n{traceback.format_exc()}")
 
-        #time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
     main()

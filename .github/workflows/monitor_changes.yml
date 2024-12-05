@@ -1,12 +1,12 @@
-name: Monitor Changes, Lint, and Send Notifications
+name: Monitor Changes, Lint, Tests and Send Notifications
 
 on:
   push:
-    branches: [ dev ]  # Adjust this to the branch you want to monitor
+    branches: [ dev ] 
   workflow_dispatch:
 
 jobs:
-  lint_and_notify:
+  lint_tests_and_notify:
     runs-on: ubuntu-24.04
 
     steps:

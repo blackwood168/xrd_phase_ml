@@ -91,19 +91,19 @@ jobs:
         to: ${{ secrets.TELEGRAM_CHAT_ID }}
         token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         message: |
-            🔄 Новые изменения обнаружены!
+            🔄 Новые изменения обнаружены! 🎉
             
-            Сообщение коммита: ${{ steps.commit_details.outputs.message || 'Нет сообщения' }}
-            Автор: ${{ steps.commit_details.outputs.author || 'Неизвестный автор' }}
+            📝 Сообщение коммита: ${{ steps.commit_details.outputs.message || 'Нет сообщения' }}
+            👤 Автор: ${{ steps.commit_details.outputs.author || 'Неизвестный автор' }}
             
-            Измененные файлы:
+            📂 Измененные файлы:
             ${{ steps.check_changes.outputs.files_changed || 'Нет измененных файлов' }}
             
-            Репозиторий: ${{ github.repository }}
-            Ссылка: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+            📚 Репозиторий: ${{ github.repository }}
+            🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
             
             ⚠️ Результаты линтинга:
-            ${{ steps.flake8.outputs.lint_results || 'Нет замечаний линтера' }}
+            ${{ steps.flake8.outputs.lint_results || 'Нет замечаний линтера' }} ✨
             
             🧪 Результаты тестов:
-            ${{ steps.basic_tests.outputs.test_results || 'Тесты не были выполнены' }}
+            ${{ steps.basic_tests.outputs.test_results || 'Тесты не были выполнены' }} 🚀

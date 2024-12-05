@@ -40,10 +40,11 @@ jobs:
         changes=$(cat changes.txt | tr '\n' ', ' | sed 's/,$//')
         echo "files_changed=$changes" >> $GITHUB_OUTPUT
 
-    - name: Install flake8
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8
+        pip install -r requirements.txt
+        pip install flake8 pytest torch torchvision
 
     - name: Run flake8
       id: flake8
@@ -57,8 +58,6 @@ jobs:
           "models/unet_fft.py"
           "xrd_transformer.py"
           "model.py"
-          "datasets/train.py"
-          "datasets/test.py"
         )
         existing_files=()
         for file in "${files_to_lint[@]}"; do
@@ -70,13 +69,20 @@ jobs:
         if [ ${#existing_files[@]} -eq 0 ]; then
           echo "lint_results=No Python files found to lint" >> $GITHUB_OUTPUT
         else
-          flake8_output=$(flake8 "${existing_files[@]}" || true)
+          # Only check for bugs (E9**, F***) and ignore style issues
+          flake8_output=$(flake8 --select=E9,F "${existing_files[@]}" || true)
           echo "$flake8_output" > flake8_output.txt
           lint_results=$(head -n 5 flake8_output.txt | sed ':a;N;$!ba;s/\n/%0A/g' | sed 's/"/\\"/g')
           echo "lint_results=$lint_results" >> $GITHUB_OUTPUT
         fi
 
-
+    - name: Run basic tests
+      id: basic_tests
+      run: |
+        test_output=$(python github_tests.py)
+        echo "test_results<<EOF" >> $GITHUB_OUTPUT
+        echo "$test_output" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Send Telegram Notification
       if: always()
@@ -85,16 +91,19 @@ jobs:
         to: ${{ secrets.TELEGRAM_CHAT_ID }}
         token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         message: |
-          🔄 Новые изменения обнаружены!
-          
-          Сообщение коммита: ${{ steps.commit_details.outputs.message || 'Нет сообщения' }}
-          Автор: ${{ steps.commit_details.outputs.author || 'Неизвестный автор' }}
-          
-          Измененные файлы:
-          ${{ steps.check_changes.outputs.files_changed || 'Нет измененных файлов' }}
-          
-          Репозиторий: ${{ github.repository }}
-          Ссылка: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
-          
-          ⚠️ Результаты линтинга:
-          ${{ steps.flake8.outputs.lint_results || 'Нет замечаний линтера' }}
+            🔄 Новые изменения обнаружены!
+            
+            Сообщение коммита: ${{ steps.commit_details.outputs.message || 'Нет сообщения' }}
+            Автор: ${{ steps.commit_details.outputs.author || 'Неизвестный автор' }}
+            
+            Измененные файлы:
+            ${{ steps.check_changes.outputs.files_changed || 'Нет измененных файлов' }}
+            
+            Репозиторий: ${{ github.repository }}
+            Ссылка: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+            
+            ⚠️ Результаты линтинга:
+            ${{ steps.flake8.outputs.lint_results || 'Нет замечаний линтера' }}
+            
+            🧪 Результаты тестов:
+            ${{ steps.basic_tests.outputs.test_results || 'Тесты не были выполнены' }}

@@ -34,10 +34,14 @@ jobs:
         # Fetch both branches
         git fetch origin main dev || true
             
-        # Compare changes between dev and main branches
-        git diff --name-only origin/main origin/dev > changes.txt
-            
-        changes=$(cat changes.txt | tr '\n' ', ' | sed 's/,$//')
+        # Check if dev branch exists
+        if git rev-parse --verify origin/dev >/dev/null 2>&1; then
+            # Compare changes between dev and main branches
+            git diff --name-only origin/main origin/dev > changes.txt
+            changes=$(cat changes.txt | tr '\n' ', ' | sed 's/,$//')
+        else
+            changes="No dev branch"
+        fi
         echo "files_changed=$changes" >> $GITHUB_OUTPUT
 
     - name: Install dependencies

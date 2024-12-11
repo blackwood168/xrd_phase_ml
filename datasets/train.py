@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 class TrainDataset(Dataset):
     """Dataset class for training and validation data."""
 
-    def __init__(self, config: Dict[str, Any], mode: str = 'train') -> None:
+    def __init__(self, config: Dict[str, Any], mode: str = 'train', type: str = 'factors') -> None:
         """Initialize the dataset.
         
         Args:
@@ -22,7 +22,7 @@ class TrainDataset(Dataset):
         self.mode = mode
         self.sym_groups = []
         self.annotations = []
-
+        self.type = type
         # Set up data directories and paths
         self.img_dir = os.path.join(
             config["data_path"],
@@ -40,22 +40,23 @@ class TrainDataset(Dataset):
         # Load annotations
         self._read_csv(csv_path, first_index, max_index)
         print(f"{mode} dataset size: {len(self.annotations)}")
-
-        # Set up lattice parameter mappings
-        laue_types = {
+        print(f"Type: {type}")
+        if type != 'patterson':
+            # Set up lattice parameter mappings
+            laue_types = {
             'romb': {'h': [0, 16], 'k': [0, 21], 'l': [0, 28]},
             'clin': {'h': [-13, 12], 'k': [0, 17], 'l': [0, 22]},
             'all': {'h': [-16, 16], 'k': [-14, 21], 'l': [0, 28]}
-        }
-        self.hkl_minmax = laue_types[self.config['laue']]
-        
-        # Create index mapping dictionaries
-        dics = {'h': {}, 'k': {}, 'l': {}}
-        for letter in 'hkl':
-            min_val, max_val = self.hkl_minmax[letter]
-            for i in range(max_val - min_val + 1):
-                dics[letter][min_val + i] = i
-        self.h2ind, self.k2ind, self.l2ind = dics['h'], dics['k'], dics['l']
+            }
+            self.hkl_minmax = laue_types[self.config['laue']]
+            
+            # Create index mapping dictionaries
+            dics = {'h': {}, 'k': {}, 'l': {}}
+            for letter in 'hkl':
+                min_val, max_val = self.hkl_minmax[letter]
+                for i in range(max_val - min_val + 1):
+                    dics[letter][min_val + i] = i
+            self.h2ind, self.k2ind, self.l2ind = dics['h'], dics['k'], dics['l']
 
     def preprocess(self, image: Dict[str, np.ndarray]) -> Tuple[torch.Tensor, torch.Tensor]:
         """Preprocess the raw image data.
@@ -149,7 +150,11 @@ class TrainDataset(Dataset):
             Dictionary containing preprocessed image tensors and index
         """
         img = self.load_sample(idx)
-        image, image_recon = self.preprocess(image=img)
+        if self.type != 'patterson':
+            image, image_recon = self.preprocess(image=img)
+        else:
+            image = torch.from_numpy(img['Patt_low']).float().unsqueeze(0)
+            image_recon = torch.from_numpy(img['Patt_high']).float().unsqueeze(0)
         idx = torch.as_tensor(idx).long()
         
         return {
@@ -173,7 +178,7 @@ def collate_fn(batch: list) -> Tuple[torch.Tensor, torch.Tensor]:
     return image, image_recon
 
 
-def get_train_dl_ds(config: Dict[str, Any], mode: str = 'train') -> Tuple[DataLoader, Dataset]:
+def get_train_dl_ds(config: Dict[str, Any], mode: str = 'train', type: str = 'factors') -> Tuple[DataLoader, Dataset]:
     """Create and return training/validation dataloader and dataset.
     
     Args:
@@ -183,7 +188,7 @@ def get_train_dl_ds(config: Dict[str, Any], mode: str = 'train') -> Tuple[DataLo
     Returns:
         Tuple of (dataloader, dataset)
     """
-    dataset = TrainDataset(config, mode=mode)
+    dataset = TrainDataset(config, mode=mode, type=type)
     dataloader = DataLoader(
         dataset,
         shuffle=(mode == "train"),

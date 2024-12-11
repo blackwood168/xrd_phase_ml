@@ -16,7 +16,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.utilities import rank_zero_only
 
 from datasets.train import get_train_dl_ds
-from pl_models import TrainPipeline, XRDTransformerPipeline, GANPipeline
+from pl_models import TrainPipeline, XRDTransformerPipeline, GANPipeline, SuperResolutionUnetPipeline
 
 
 def load_config(config_path: Path) -> dict:
@@ -97,12 +97,22 @@ def train(args=None):
     )
 
     # Initialize data loaders
-    train_loader, _ = get_train_dl_ds(config, mode='train')
-    val_loader, _ = get_train_dl_ds(config, mode="val")
+    if config['pipeline'] != 'super_resolution_unet':
+        train_loader, _ = get_train_dl_ds(config, mode='train', type = 'factors')
+        val_loader, _ = get_train_dl_ds(config, mode="val", type = 'factors')
+    else: 
+        train_loader, _ = get_train_dl_ds(config, mode='train', type = 'patterson')
+        val_loader, _ = get_train_dl_ds(config, mode="val", type = 'patterson')
 
     # Initialize appropriate model
     if config['pipeline'] == 'xrd_transformer':
         model = XRDTransformerPipeline(
+            config=config,
+            train_loader=train_loader,
+            val_loader=val_loader
+        )
+    elif config['pipeline'] == 'super_resolution_unet':
+        model = SuperResolutionUnetPipeline(
             config=config,
             train_loader=train_loader,
             val_loader=val_loader

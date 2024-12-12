@@ -1,4 +1,5 @@
 import os
+from models.superformer import SuperFormer
 import numpy as np
 import lightning as L
 import pandas as pd
@@ -735,6 +736,158 @@ class SuperResolutionUnetPipeline(L.LightningModule):
         # Initialize model
         self.model = SuperResolutionUnet(
             config['unet_layers']
+        )
+        
+        # Load pre-trained weights if specified
+        if config['weights'] is not None:
+            state_dict = {}
+            state_old = torch.load(config['weights'])['state_dict']
+            for key in state_old.keys():
+                key_new = key[6:]
+                state_dict[key_new] = state_old[key]
+            self.model.load_state_dict(state_dict, strict=True)
+            print('Loaded successfully')
+            
+        # Initialize loss functions and metrics
+        self.criterion = SSIMLoss()
+        self.mse_loss = MeanSquaredError()
+        self.ssim = SSIM(
+            data_range=1,
+            size_average=True,
+            channel=1,
+            nonnegative_ssim=True,
+            spatial_dims=3
+        )
+        
+        metrics = MetricCollection([MeanSquaredError()])
+        self.train_metrics = metrics.clone(postfix="/train")
+        self.valid_metrics = metrics.clone(postfix="/val")
+
+        # Store data loaders
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.num_training_steps = len(self.train_loader)
+
+        self.save_hyperparameters(config)
+
+    def configure_optimizers(self):
+        """Configure optimizers and learning rate schedulers."""
+        # Configure optimizer
+        if self.config['optimizer'] == "adam":
+            optimizer = optim.Adam(
+                filter(lambda p: p.requires_grad, self.model.parameters()),
+                **self.config['optimizer_params']
+            )
+        elif self.config['optimizer'] == "sgd":
+            optimizer = optim.SGD(
+                filter(lambda p: p.requires_grad, self.model.parameters()),
+                momentum=0.9,
+                nesterov=True,
+                **self.config['optimizer_params']
+            )
+        else:
+            raise ValueError(f"Unknown optimizer name: {self.config['optimizer']}")
+
+        # Configure scheduler
+        scheduler_params = self.config['scheduler_params']
+        if self.hparams.scheduler == "plateau":
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer=optimizer,
+                patience=scheduler_params['patience'],
+                min_lr=1e-9,
+                factor=scheduler_params['factor'],
+                mode=scheduler_params['mode'],
+                verbose=scheduler_params['verbose'],
+            )
+
+            lr_scheduler = {
+                'scheduler': scheduler,
+                'interval': 'epoch',
+                'monitor': scheduler_params['target_metric']
+            }
+        elif self.config['scheduler'] == "cosine":
+            scheduler = get_cosine_schedule_with_warmup(
+                optimizer,
+                num_warmup_steps=self.num_training_steps * scheduler_params['warmup_epochs'],
+                num_training_steps=int(self.num_training_steps * self.config['trainer']['max_epochs'])
+            )
+
+            lr_scheduler = {
+                'scheduler': scheduler,
+                'interval': 'step'
+            }
+        else:
+            raise ValueError(f"Unknown scheduler name: {self.config['scheduler']}")
+
+        return [optimizer], [lr_scheduler]
+
+    def train_dataloader(self):
+        """Return the training dataloader."""
+        return self.train_loader
+
+    def val_dataloader(self):
+        """Return the validation dataloader."""
+        return self.val_loader
+
+    def training_step(self, batch, batch_idx):
+        """Execute a single training step."""
+        x, y = batch
+        out = self.model(x)
+        # Calculate loss
+        loss = self.criterion(out, y)
+        self.log("Loss/train", loss, prog_bar=True)
+        
+        # Update metrics
+        self.train_metrics.update(out, y)
+        
+        self.log('SSIM_loss/train', 1 - self.ssim(out, y))
+        
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        """Execute a single validation step."""
+        x, y = batch
+        out = self.model(x)
+        # Calculate loss
+        loss = self.criterion(out, y)
+        self.log("Loss/val", loss, prog_bar=True)
+        
+        # Update metrics
+        self.valid_metrics.update(out, y)
+        
+        # Log metrics
+        self.log('SSIM_loss/val', 1 - self.ssim(out, y))
+ 
+    def on_training_epoch_end(self):
+        """Compute and log training metrics at the end of each epoch."""
+        train_metrics = self.train_metrics.compute()
+        self.log_dict(train_metrics)
+        self.train_metrics.reset()
+
+    def on_validation_epoch_end(self):
+        """Compute and log validation metrics at the end of each epoch."""
+        valid_metrics = self.valid_metrics.compute()
+        self.log_dict(valid_metrics)
+        self.valid_metrics.reset()
+
+
+class SuperFormerPipeline(L.LightningModule):
+    """Pipeline for training various models."""
+
+    def __init__(self, config, train_loader, val_loader) -> None:
+        """Initialize the pipeline.
+        
+        Args:
+            config: Configuration dictionary
+            train_loader: Training data loader
+            val_loader: Validation data loader
+        """
+        super().__init__()
+        self.config = config
+
+        # Initialize model
+        self.model = SuperFormer(
+            
         )
         
         # Load pre-trained weights if specified

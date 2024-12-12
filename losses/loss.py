@@ -17,7 +17,7 @@ class SSIMLoss(nn.Module):
     def __init__(self):
         super().__init__()
         self.ssim = SSIM(data_range=1, size_average=True, channel=1, nonnegative_ssim=True, spatial_dims=3,
-                         win_size=5)
+                         win_size=7)
         self.mse_loss = nn.MSELoss()
         self.alpha = 0.8
 

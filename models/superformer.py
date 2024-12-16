@@ -475,11 +475,11 @@ class RSTB(nn.Module):
                                       nn.LeakyReLU(negative_slope=0.2, inplace=True),
                                       nn.Conv3d(dim // 4, dim, 3, 1, 1))
         self.patch_embed = PatchEmbed3D(
-            img_size=img_size, patch_size=patch_size, in_chans=0, embed_dim=dim,
+            img_size=img_size, patch_size=patch_size, in_chans=dim, embed_dim=dim,
             norm_layer=None)
 
         self.patch_unembed = PatchUnEmbed3D(
-            img_size=img_size, patch_size=patch_size, in_chans=0, embed_dim=dim,
+            img_size=img_size, patch_size=patch_size, in_chans=dim, embed_dim=dim,
             norm_layer=None)
 
     def forward(self, x, x_size):
@@ -784,7 +784,7 @@ class SuperFormer(nn.Module):
     """
 
     def __init__(self, img_size=12, patch_size=1, in_chans=1,
-                 embed_dim=72, depths=[6, 6, 6, 6], num_heads=[6, 6, 6, 6],
+                 embed_dim=72, depths=[4, 4, 4, 4], num_heads=[4, 4, 4, 4],
                  window_size=1, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0.1, attn_drop_rate=0.1, drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, rpb=True ,patch_norm=False,
@@ -829,7 +829,7 @@ class SuperFormer(nn.Module):
             norm_layer = norm_layer if self.patch_norm else None, level = "first")
         num_patches = self.patch_embed_volume.num_patches
         patches_resolution = self.patch_embed_volume.patches_resolution
-        print('patches_resolution', patches_resolution)
+        #print('patches_resolution', patches_resolution)
         self.patches_resolution = patches_resolution
 
         self.patch_unembed = PatchUnEmbed3D(
@@ -885,7 +885,8 @@ class SuperFormer(nn.Module):
         if self.upsampler == 'pixelshuffle':
             self.conv_before_upsample = nn.Sequential(nn.Conv3d(embed_dim, num_feat, 3, 1, 1),
                                                       nn.LeakyReLU(inplace=True))
-            self.upsample = Upsample(upscale, num_feat)
+            self.upsample = nn.Sequential(Upsample(upscale, num_feat),
+                                          nn.LeakyReLU(inplace=True))
             print('made pixelshuffle upsample')
             self.conv_last = nn.Conv3d(num_feat, num_out_ch, 3, 1, 1)
         elif self.upsampler == 'pixelshuffledirect':
@@ -950,7 +951,8 @@ class SuperFormer(nn.Module):
         if self.patch_size>1:
             x_size = self.patches_resolution
         else:
-            x_size = self.patches_resolution
+            x_size = (x.shape[2], x.shape[3], x.shape[4])
+        #print(x_size)
         x_feat = self.patch_embed_features(x_feat)
         x_vol= self.patch_embed_volume(x)
 
@@ -959,7 +961,7 @@ class SuperFormer(nn.Module):
             x_vol = x_vol + self.absolute_pos_embed
         x_feat = self.pos_drop(x_feat)
         x_vol = self.pos_drop(x_vol)
-        print(x_feat.shape, x_vol.shape)
+        #print(x_feat.shape, x_vol.shape)
         for layer in self.layers:
             x_feat = layer(x_feat, x_size)
             x_vol = layer(x_vol, x_size)
@@ -974,16 +976,16 @@ class SuperFormer(nn.Module):
         H, W, D = x.shape[2:]
         x = self.check_image_size(x)
 
-        self.mean = self.mean.type_as(x)
-        x = (x - self.mean) * self.img_range
+        #self.mean = self.mean.type_as(x)
+        #x = (x - self.mean) * self.img_range
 
         if self.upsampler == 'pixelshuffle':
             x_first = self.conv_first(x)
             x_feat, x_vol = self.forward_features(x, x_first)
             res_deep = (x_feat + x_vol)/2
             res_deep = self.conv_after_body(res_deep)
-            print('res_deep', res_deep.shape)
-            print('x_first', x_first.shape)
+            #print('res_deep', res_deep.shape)
+            #print('x_first', x_first.shape)
             x = res_deep + x_first
             x = self.conv_before_upsample(x)
             x = self.conv_last(self.upsample(x))
@@ -1032,8 +1034,8 @@ class SuperFormer(nn.Module):
             else:
                 x = self.conv_last(self.conv_before_last(res))
 
-        x = x / self.img_range + self.mean
-
+        #x = x / self.img_range + self.mean
+        assert not torch.isnan(x).any()
         return x[:, :, :H*self.upscale, :W*self.upscale, :D*self.upscale]
 
     def flops(self):

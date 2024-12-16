@@ -84,7 +84,68 @@ class UpBlock(nn.Module):
         x = torch.cat([x, skip_input], dim=1)
         return self.double_conv(x)
 
+class PixelShuffle3d(nn.Module):
+    def __init__(self, upscale_factor=None):
+        super().__init__()
 
+        if upscale_factor is None:
+            raise TypeError('__init__() missing 1 required positional argument: \'upscale_factor\'')
+
+        self.upscale_factor = upscale_factor
+
+    def forward(self, x):
+        if x.ndim < 3:
+            raise RuntimeError(
+                f'pixel_shuffle expects input to have at least 3 dimensions, but got input with {x.ndim} dimension(s)'
+            )
+        elif x.shape[-4] % self.upscale_factor**3 != 0:
+            raise RuntimeError(
+                f'pixel_shuffle expects its input\'s \'channel\' dimension to be divisible by the cube of upscale_factor, but input.size(-4)={x.shape[-4]} is not divisible by {self.upscale_factor**3}'
+            )
+
+        channels, in_depth, in_height, in_width = x.shape[-4:]
+        nOut = channels // self.upscale_factor ** 3
+
+        out_depth = in_depth * self.upscale_factor
+        out_height = in_height * self.upscale_factor
+        out_width = in_width * self.upscale_factor
+
+        input_view = x.contiguous().view(
+            *x.shape[:-4],
+            nOut,
+            self.upscale_factor,
+            self.upscale_factor,
+            self.upscale_factor,
+            in_depth,
+            in_height,
+            in_width
+        )
+
+        axes = torch.arange(input_view.ndim)[:-6].tolist() + [-3, -6, -2, -5, -1, -4]
+        output = input_view.permute(axes).contiguous()
+
+        return output.view(*x.shape[:-4], nOut, out_depth, out_height, out_width)
+import math
+class Upsample(nn.Sequential):
+    """Upsample module.
+
+    Args:
+        scale (int): Scale factor. Supported scales: 2^n and 3.
+        num_feat (int): Channel number of intermediate features.
+    """
+    
+    def __init__(self, scale, num_feat):
+        m = []
+        if (scale & (scale - 1)) == 0:  
+            for _ in range(int(math.log(scale, 2))):
+                m.append(nn.Conv3d(num_feat, 8 * num_feat, 3, 1, 1))
+                m.append(PixelShuffle3d(2))
+        elif scale == 3:
+            m.append(nn.Conv3d(num_feat, 9 * num_feat, 3, 1, 1))
+            m.append(PixelShuffle3d(3))
+        else:
+            raise ValueError(f'scale {scale} is not supported. ' 'Supported scales: 2^n and 3.')
+        super(Upsample, self).__init__(*m)
 class SuperResolutionUnet(nn.Module):
     """Mini U-Net architecture for 3D image processing."""
 
@@ -120,14 +181,13 @@ class SuperResolutionUnet(nn.Module):
         for filters in reversed(self.filters):
             self.up_blocks.append(UpBlock(in_channels + filters, filters, self.up_sample_mode))
             in_channels = filters
-
+        self.conv_before_upsample = nn.Conv3d(self.filters[0], out_classes, kernel_size=3, padding=1) #added this
         # Final convolution
-        self.conv_last = nn.Conv3d(self.filters[0], out_classes, kernel_size=1)
+        self.conv_last = nn.Conv3d(out_classes, out_classes, kernel_size=1)
 
-        self.final_upsample = nn.Upsample(
-            scale_factor=2,
-            mode='trilinear',
-            align_corners=False
+        self.final_upsample = Upsample( #new upsample
+            scale=2,
+            num_feat=out_classes
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -156,5 +216,5 @@ class SuperResolutionUnet(nn.Module):
         for up_block in self.up_blocks:
             skip = skip_connections.pop()
             x = up_block(x, skip)
-        
-        return self.final_upsample(self.conv_last(x))
+        x = self.conv_before_upsample(x) #new conv
+        return self.conv_last(self.final_upsample(x))

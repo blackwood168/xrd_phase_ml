@@ -555,7 +555,7 @@ class PatchEmbed3D(nn.Module):
         if patch_size>1:
             self.proj = nn.Conv3d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
         else:
-            self.proj = None
+            self.proj = nn.Conv3d(in_chans, embed_dim, kernel_size=1, stride=1)
         patch_size = to_3tuple(patch_size)
         patches_resolution = [img_size[0] // patch_size[0], img_size[1] // patch_size[1],img_size[2] // patch_size[2] ]
         self.img_size = img_size
@@ -572,11 +572,17 @@ class PatchEmbed3D(nn.Module):
             self.norm = None
 
     def forward(self, x):
-        if self.proj:
-            proj_x = self.proj(x)
-            x = proj_x.flatten(2).transpose(1,2)
-        else:
-            x = x.flatten(2).transpose(1, 2)  
+        B, C, H, W, D = x.shape
+        
+        # Always use projection to ensure correct channel dimension
+        if self.proj is not None:
+            x = self.proj(x)
+            
+        # Reshape to [B, embed_dim, H*W*D]
+        x = x.reshape(B, self.embed_dim, -1)
+        
+        # Transpose to [B, H*W*D, embed_dim]
+        x = x.transpose(1, 2)
         if self.norm is not None:
             x = self.norm(x)
         return x
@@ -639,7 +645,9 @@ class PatchUnEmbed3D(nn.Module):
         super().__init__()
         img_size = to_3tuple(img_size)
         patch_size = to_3tuple(patch_size)
-        patches_resolution = patches_resolution = [img_size[0] // patch_size[0], img_size[1] // patch_size[1], img_size[2]//patch_size[2]]
+        patches_resolution =  [img_size[0] // patch_size[0],
+                                img_size[1] // patch_size[1],
+                                 img_size[2]//patch_size[2]]
         self.img_size = img_size
         self.patch_size = patch_size
         self.patches_resolution = patches_resolution
@@ -659,6 +667,47 @@ class PatchUnEmbed3D(nn.Module):
         flops = 0
         return flops
 
+class PixelShuffle3d(nn.Module):
+    def __init__(self, upscale_factor=None):
+        super().__init__()
+
+        if upscale_factor is None:
+            raise TypeError('__init__() missing 1 required positional argument: \'upscale_factor\'')
+
+        self.upscale_factor = upscale_factor
+
+    def forward(self, x):
+        if x.ndim < 3:
+            raise RuntimeError(
+                f'pixel_shuffle expects input to have at least 3 dimensions, but got input with {x.ndim} dimension(s)'
+            )
+        elif x.shape[-4] % self.upscale_factor**3 != 0:
+            raise RuntimeError(
+                f'pixel_shuffle expects its input\'s \'channel\' dimension to be divisible by the cube of upscale_factor, but input.size(-4)={x.shape[-4]} is not divisible by {self.upscale_factor**3}'
+            )
+
+        channels, in_depth, in_height, in_width = x.shape[-4:]
+        nOut = channels // self.upscale_factor ** 3
+
+        out_depth = in_depth * self.upscale_factor
+        out_height = in_height * self.upscale_factor
+        out_width = in_width * self.upscale_factor
+
+        input_view = x.contiguous().view(
+            *x.shape[:-4],
+            nOut,
+            self.upscale_factor,
+            self.upscale_factor,
+            self.upscale_factor,
+            in_depth,
+            in_height,
+            in_width
+        )
+
+        axes = torch.arange(input_view.ndim)[:-6].tolist() + [-3, -6, -2, -5, -1, -4]
+        output = input_view.permute(axes).contiguous()
+
+        return output.view(*x.shape[:-4], nOut, out_depth, out_height, out_width)
 
 class Upsample(nn.Sequential):
     """Upsample module.
@@ -667,16 +716,16 @@ class Upsample(nn.Sequential):
         scale (int): Scale factor. Supported scales: 2^n and 3.
         num_feat (int): Channel number of intermediate features.
     """
-
+    
     def __init__(self, scale, num_feat):
         m = []
         if (scale & (scale - 1)) == 0:  
             for _ in range(int(math.log(scale, 2))):
-                m.append(nn.Conv2d(num_feat, 4 * num_feat, 3, 1, 1))
-                m.append(nn.PixelShuffle(2))
+                m.append(nn.Conv3d(num_feat, 8 * num_feat, 3, 1, 1))
+                m.append(PixelShuffle3d(2))
         elif scale == 3:
-            m.append(nn.Conv2d(num_feat, 9 * num_feat, 3, 1, 1))
-            m.append(nn.PixelShuffle(3))
+            m.append(nn.Conv3d(num_feat, 9 * num_feat, 3, 1, 1))
+            m.append(PixelShuffle3d(3))
         else:
             raise ValueError(f'scale {scale} is not supported. ' 'Supported scales: 2^n and 3.')
         super(Upsample, self).__init__(*m)
@@ -734,12 +783,12 @@ class SuperFormer(nn.Module):
         resi_connection: The convolutional block before residual connection. '1conv'/'3conv'
     """
 
-    def __init__(self, img_size=12, patch_size=3, in_chans=1,
+    def __init__(self, img_size=12, patch_size=1, in_chans=1,
                  embed_dim=72, depths=[6, 6, 6, 6], num_heads=[6, 6, 6, 6],
-                 window_size=2, mlp_ratio=4., qkv_bias=True, qk_scale=None,
-                 drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
-                 norm_layer=nn.LayerNorm, ape=False, rpb=True ,patch_norm=True,
-                 use_checkpoint=False, upscale=2, img_range=1., upsampler='', resi_connection='1conv',
+                 window_size=1, mlp_ratio=4., qkv_bias=True, qk_scale=None,
+                 drop_rate=0.1, attn_drop_rate=0.1, drop_path_rate=0.1,
+                 norm_layer=nn.LayerNorm, ape=False, rpb=True ,patch_norm=False,
+                 use_checkpoint=False, upscale=2, img_range=1., upsampler='pixelshuffle', resi_connection='1conv',
                  output_type = "",num_feat=64,**kwargs):
         super(SuperFormer, self).__init__()
         num_in_ch = in_chans
@@ -780,6 +829,7 @@ class SuperFormer(nn.Module):
             norm_layer = norm_layer if self.patch_norm else None, level = "first")
         num_patches = self.patch_embed_volume.num_patches
         patches_resolution = self.patch_embed_volume.patches_resolution
+        print('patches_resolution', patches_resolution)
         self.patches_resolution = patches_resolution
 
         self.patch_unembed = PatchUnEmbed3D(
@@ -833,10 +883,11 @@ class SuperFormer(nn.Module):
         #####################################################################################################
         ################################ 3D high quality image reconstruction ################################
         if self.upsampler == 'pixelshuffle':
-            self.conv_before_upsample = nn.Sequential(nn.Conv2d(embed_dim, num_feat, 3, 1, 1),
+            self.conv_before_upsample = nn.Sequential(nn.Conv3d(embed_dim, num_feat, 3, 1, 1),
                                                       nn.LeakyReLU(inplace=True))
             self.upsample = Upsample(upscale, num_feat)
-            self.conv_last = nn.Conv2d(num_feat, num_out_ch, 3, 1, 1)
+            print('made pixelshuffle upsample')
+            self.conv_last = nn.Conv3d(num_feat, num_out_ch, 3, 1, 1)
         elif self.upsampler == 'pixelshuffledirect':
             self.upsample = UpsampleOneStep(upscale, embed_dim, num_out_ch,
                                             (patches_resolution[0], patches_resolution[1]))
@@ -862,12 +913,12 @@ class SuperFormer(nn.Module):
                                                       nn.LeakyReLU(inplace=True))
                 self.conv_last= nn.Conv3d(num_feat, num_out_ch, 1, 1, 0)
 
-        self.upsample_feat = nn.Sequential(
-            nn.ConvTranspose3d(embed_dim, embed_dim, kernel_size=self.upscale, stride=self.upscale),
-            nn.Conv3d(embed_dim, embed_dim, 3, 1, 1),
-            nn.InstanceNorm3d(embed_dim), 
-            nn.LeakyReLU(inplace=True)
-        )
+        #self.upsample_feat = nn.Sequential(
+        #    nn.ConvTranspose3d(embed_dim, embed_dim, kernel_size=self.upscale, stride=self.upscale),
+        #    nn.Conv3d(embed_dim, embed_dim, 3, 1, 1),
+        #    nn.InstanceNorm3d(embed_dim), 
+        #    nn.LeakyReLU(inplace=True)
+       # )
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -899,7 +950,7 @@ class SuperFormer(nn.Module):
         if self.patch_size>1:
             x_size = self.patches_resolution
         else:
-            x_size = (x.shape[2], x.shape[3], x.shape[4])
+            x_size = self.patches_resolution
         x_feat = self.patch_embed_features(x_feat)
         x_vol= self.patch_embed_volume(x)
 
@@ -908,7 +959,7 @@ class SuperFormer(nn.Module):
             x_vol = x_vol + self.absolute_pos_embed
         x_feat = self.pos_drop(x_feat)
         x_vol = self.pos_drop(x_vol)
-
+        print(x_feat.shape, x_vol.shape)
         for layer in self.layers:
             x_feat = layer(x_feat, x_size)
             x_vol = layer(x_vol, x_size)
@@ -927,8 +978,13 @@ class SuperFormer(nn.Module):
         x = (x - self.mean) * self.img_range
 
         if self.upsampler == 'pixelshuffle':
-            x = self.conv_first(x)
-            x = self.conv_after_body(self.forward_features(x)) + x
+            x_first = self.conv_first(x)
+            x_feat, x_vol = self.forward_features(x, x_first)
+            res_deep = (x_feat + x_vol)/2
+            res_deep = self.conv_after_body(res_deep)
+            print('res_deep', res_deep.shape)
+            print('x_first', x_first.shape)
+            x = res_deep + x_first
             x = self.conv_before_upsample(x)
             x = self.conv_last(self.upsample(x))
         elif self.upsampler == 'pixelshuffledirect':

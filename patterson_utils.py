@@ -80,7 +80,6 @@ def recover_intensities_from_patterson(patterson_map, miller_indices, unit_cell_
     Recover structure factor intensities from Patterson map using FFT.
     
     Args:
-        xrs: X-ray structure object
         patterson_map: 3D numpy array containing Patterson map
         miller_indices: Array of Miller indices (h,k,l)
     

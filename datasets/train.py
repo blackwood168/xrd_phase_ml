@@ -49,7 +49,9 @@ class TrainDataset(Dataset):
             'all': {'h': [-16, 16], 'k': [-14, 21], 'l': [0, 28]}
             }
             self.hkl_minmax = laue_types[self.config['laue']]
-            
+            if self.config['high_d'] == 1.0:
+                self.hkl_minmax = {'h': [-11, 11], 'k': [0, 15], 'l': [0, 20]}
+                print('using 1.2->1.0')
             # Create index mapping dictionaries
             dics = {'h': {}, 'k': {}, 'l': {}}
             for letter in 'hkl':
@@ -82,6 +84,7 @@ class TrainDataset(Dataset):
         # Fill arrays with intensity values
         for j, ind in enumerate(ind_high):
             h, k, l = ind
+            
             if h in self.h2ind.keys() and k in self.k2ind.keys() and l in self.l2ind.keys():
                 high[0, self.h2ind[h], self.k2ind[k], self.l2ind[l]] = intensity[j]
             

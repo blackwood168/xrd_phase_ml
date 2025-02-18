@@ -116,7 +116,8 @@ class HKLEmbedding(nn.Module):
 
 class XRDTransformer(nn.Module):
     def __init__(self, 
-                 input_shape=(26, 18, 23),
+                 #input_shape=(26, 18, 23),
+                 input_shape=(23, 16, 21),
                  embed_dim=256,
                  depth=6,
                  num_heads=8,

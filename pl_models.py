@@ -643,7 +643,7 @@ class XRDTransformerTestPipeline(L.LightningModule):
         
         # Initialize XRDTransformer model
         self.model = XRDTransformer(
-            input_shape=(26, 18, 23),
+            input_shape=(23, 16, 21),#(26, 18, 23),
             embed_dim=128,
             depth=5,
             num_heads=4,
